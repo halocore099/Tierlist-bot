@@ -262,8 +262,8 @@ Here's a complete example of a properly configured `config.json`:
     "NA": "1122334455667788990",
     "AS": "9988776655443322110"
   },
-  "testerRoleId": "1438526508661604381",
-  "pingRoleId": "1111222233334444555",
+  "testerRoleId": "1111222233334444555",
+  "pingRoleId": "2222333344445555666",
   "maxQueueSize": 20,
   "confirmationGracePeriod": 5
 }
