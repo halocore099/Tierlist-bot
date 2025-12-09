@@ -17,8 +17,9 @@ const DATA_FILE = path.join(__dirname, "waitlist-data.json");
 // STATE MANAGEMENT
 // ============================================================================
 
-// Waitlist data structure: { users: { userId: { userId, region, preferredServer, unlockedChannels: [] } } }
-let waitlistData = { users: {} };
+// Waitlist data structure: { users: { userId: { userId, region, preferredServer, unlockedChannels: [], cooldownEndTime: null } } }
+// Also tracks cooldowns: { cooldowns: { userId: cooldownEndTime } }
+let waitlistData = { users: {}, cooldowns: {} };
 
 // ============================================================================
 // INITIALIZATION
@@ -30,11 +31,14 @@ let waitlistData = { users: {} };
 function initialize() {
 	try {
 		const data = loadDataAtomic(DATA_FILE);
-		waitlistData = data.users ? { users: data.users } : { users: {} };
+		waitlistData = {
+			users: data.users ? data.users : {},
+			cooldowns: data.cooldowns ? data.cooldowns : {}
+		};
 		console.log(`Loaded ${Object.keys(waitlistData.users).length} waitlist user(s) from persistence.`);
 	} catch (error) {
 		console.error("Error initializing waitlist manager:", error.message);
-		waitlistData = { users: {} };
+		waitlistData = { users: {}, cooldowns: {} };
 	}
 }
 
@@ -62,11 +66,23 @@ function saveAllData() {
  * @param {string} userId - User ID
  * @param {string} region - Region (EU, NA, AS)
  * @param {string} preferredServer - Preferred server string
- * @returns {boolean} True if added, false if already exists
+ * @param {number} cooldownDays - Cooldown period in days (optional, for checking)
+ * @returns {Object} { success: boolean, reason?: string } - success true if added, false with reason if not
  */
-function addToWaitlist(userId, region, preferredServer) {
+function addToWaitlist(userId, region, preferredServer, cooldownDays = 30) {
 	if (waitlistData.users[userId]) {
-		return false; // Already in waitlist
+		return { success: false, reason: "already_in_waitlist" }; // Already in waitlist
+	}
+	
+	// Check if user is on cooldown
+	if (waitlistData.cooldowns[userId]) {
+		const cooldownEndTime = waitlistData.cooldowns[userId];
+		if (Date.now() < cooldownEndTime) {
+			const daysRemaining = Math.ceil((cooldownEndTime - Date.now()) / (1000 * 60 * 60 * 24));
+			return { success: false, reason: "cooldown", daysRemaining };
+		}
+		// Cooldown expired, remove it
+		delete waitlistData.cooldowns[userId];
 	}
 	
 	waitlistData.users[userId] = {
@@ -77,7 +93,18 @@ function addToWaitlist(userId, region, preferredServer) {
 	};
 	
 	saveAllData();
-	return true;
+	return { success: true };
+}
+
+/**
+ * Set cooldown for a user (prevents them from rejoining waitlist)
+ * @param {string} userId - User ID
+ * @param {number} days - Cooldown period in days
+ */
+function setCooldown(userId, days) {
+	const cooldownEndTime = Date.now() + (days * 24 * 60 * 60 * 1000);
+	waitlistData.cooldowns[userId] = cooldownEndTime;
+	saveAllData();
 }
 
 /**
@@ -169,5 +196,6 @@ module.exports = {
 	unlockRegionChannel,
 	hasUnlockedRegion,
 	removeFromWaitlist,
-	getAllUsers
+	getAllUsers,
+	setCooldown
 };

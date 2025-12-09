@@ -92,7 +92,9 @@
 
 3. **Validation**:
    - Bot validates region (must be EU, NA, or AS)
-   - If invalid: Error message, player can try again
+   - Bot checks if player is on cooldown
+   - If invalid region: Error message, player can try again
+   - If on cooldown: Error message showing days remaining until cooldown expires
    - If valid: Success!
 
 4. **Channel unlocked**:
@@ -126,7 +128,13 @@
    - Private ticket channel is created (only player and tester can see)
    - Ticket shows player's region and preferred server
    - Tester tests the player
-   - After testing, tester clicks "Cancel" or "Submit" to close the ticket
+   - After testing:
+     - **Cancel button**: Both tester and player can click this to cancel the ticket (no cooldown applied, player remains in waitlist)
+     - **Submit button**: Only the tester can click this to submit the ticket
+       - Player is removed from waitlist
+       - Player's queue channel access is revoked
+       - Player is placed on cooldown (default 30 days, configurable)
+       - Player cannot rejoin waitlist until cooldown expires
 
 5. **Leave queue** (optional):
    - Player can leave at any time (though this is rare once in queue)
@@ -182,6 +190,17 @@
 - **Position number** = Your place in line (1 = first, 2 = second, etc.)
 - **✅** next to name = User has confirmed they're still active (during confirmation period)
 
+### Waitlist Cooldown System
+
+When a tester submits a ticket (clicks "Submit" button):
+- Player is automatically removed from the waitlist
+- Player's queue channel access is revoked (channel becomes hidden)
+- Player is placed on cooldown (default: 30 days, configurable)
+- Player cannot rejoin the waitlist until the cooldown expires
+- If player tries to join during cooldown, they'll see: "You are on cooldown. You can join the waitlist again in X day(s)."
+
+**Note**: The "Cancel" button does NOT apply cooldown - it only closes the ticket without removing the player from the waitlist.
+
 ### Important Rules
 
 1. **Waitlist First**: You must join the waitlist before you can access queue channels
@@ -189,6 +208,7 @@
 3. **Confirmation**: When queue reopens, you have 5 minutes to confirm you're still active
 4. **Rate limiting**: Can't spam buttons (1 second cooldown for most buttons, 5 seconds for "Still Active")
 5. **Queue order**: Confirmed users → New users
+6. **Cooldown**: After a tester submits your ticket, you'll be on cooldown and cannot rejoin the waitlist until it expires
 
 ---
 

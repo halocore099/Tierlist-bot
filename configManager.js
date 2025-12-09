@@ -59,6 +59,10 @@ function loadConfig() {
 			config.confirmationGracePeriod = 5;
 		}
 		
+		if (typeof config.waitlistCooldownDays !== "number") {
+			config.waitlistCooldownDays = 30;
+		}
+		
 		console.log("✓ Config loaded successfully");
 		return config;
 	} catch (error) {

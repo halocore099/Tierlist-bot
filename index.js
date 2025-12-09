@@ -200,34 +200,42 @@ async function processConfirmationPeriod(region) {
 			return;
 		}
 		
+		// Store confirmation message ID before processing (processConfirmationPeriod clears it)
+		const confirmationMessageId = queue.confirmationMessageId;
+		
 		// Process the confirmation period
 		queueManager.processConfirmationPeriod(region);
 		
 		// Get channel and delete confirmation message
 		const channelId = config.queueChannels[region];
-		if (channelId && queue.confirmationMessageId) {
+		const channel = bot.channels.cache.get(channelId);
+		
+		if (channel && confirmationMessageId) {
 			try {
-				const channel = bot.channels.cache.get(channelId);
-				if (channel) {
-					const message = await channel.messages.fetch(queue.confirmationMessageId).catch(() => null);
-					if (message) {
-						await message.delete();
-					}
+				const message = await channel.messages.fetch(confirmationMessageId).catch(() => null);
+				if (message) {
+					await message.delete();
 				}
 			} catch (error) {
 				console.error(`Error deleting confirmation message for ${region}:`, error.message);
 			}
 		}
 		
+		// Get updated queue after processing
+		const updatedQueue = queueManager.getQueue(region);
+		
 		// Update queue embed
 		await updateQueueEmbed(region);
 		
-		// Ping role that queue is open
+		// Ping role that queue is open and track the message
 		try {
-			const channelId = config.queueChannels[region];
-			const channel = bot.channels.cache.get(channelId);
 			if (channel && config.pingRoleId) {
-				await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+				const pingMessage = await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+				// Track ping message for cleanup
+				if (updatedQueue) {
+					updatedQueue.pingMessageId = pingMessage.id;
+					queueManager.saveAllQueues();
+				}
 			}
 		} catch (error) {
 			console.error(`Error pinging role for ${region}:`, error.message);
@@ -536,7 +544,7 @@ setInterval(async () => {
 // ============================================================================
 
 // Bot ready event
-bot.on("ready", async () => {
+bot.on("clientReady", async () => {
 	console.log("Discord Waitlist Queue Bot is running.");
 	
 	try {
@@ -637,6 +645,21 @@ bot.on("ready", async () => {
 									required: true,
 									min_value: 1,
 									max_value: 60
+								}
+							]
+						},
+						{
+							type: ApplicationCommandOptionType.Subcommand,
+							name: "waitlist-cooldown",
+							description: "Set waitlist cooldown period in days",
+							options: [
+								{
+									type: ApplicationCommandOptionType.Integer,
+									name: "days",
+									description: "Cooldown period in days",
+									required: true,
+									min_value: 1,
+									max_value: 365
 								}
 							]
 						}
@@ -829,6 +852,15 @@ bot.on("interactionCreate", async (interaction) => {
 					} else {
 						await interaction.reply({ content: `⚠️ Confirmation grace period set to ${minutes} minutes, but failed to save to config.json. Please update it manually.`, ephemeral: true });
 					}
+				} else if (subcommand === "waitlist-cooldown") {
+					const days = interaction.options.getInteger("days");
+					const saved = configManager.updateConfig("waitlistCooldownDays", days);
+					if (saved) {
+						config.waitlistCooldownDays = days;
+						await interaction.reply({ content: `✅ Waitlist cooldown set to ${days} days and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Waitlist cooldown set to ${days} days, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				}
 			} else if (commandName === "q") {
 				const subcommand = interaction.options.getSubcommand();
@@ -874,10 +906,13 @@ bot.on("interactionCreate", async (interaction) => {
 							}
 						}
 					} else if (queue.state === "open") {
-						// Ping role that queue is open
+						// Ping role that queue is open and track the message
 						const channel = bot.channels.cache.get(config.queueChannels[region]);
 						if (channel && config.pingRoleId) {
-							await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+							const pingMessage = await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+							// Track ping message for cleanup
+							queue.pingMessageId = pingMessage.id;
+							queueManager.saveAllQueues();
 						}
 					}
 					
@@ -890,6 +925,42 @@ bot.on("interactionCreate", async (interaction) => {
 					}
 					
 					queueManager.setTesterInactive(region, interaction.user.id);
+					
+					// Delete ping message if queue closed
+					const queue = queueManager.getQueue(region);
+					if (queue && queue.state === "closed" && queue.pingMessageId) {
+						try {
+							const channel = bot.channels.cache.get(config.queueChannels[region]);
+							if (channel) {
+								const pingMessage = await channel.messages.fetch(queue.pingMessageId).catch(() => null);
+								if (pingMessage) {
+									await pingMessage.delete();
+								}
+							}
+							queue.pingMessageId = null;
+							queueManager.saveAllQueues();
+						} catch (error) {
+							console.error(`Error deleting ping message for ${region}:`, error.message);
+						}
+					}
+					
+					// Delete confirmation message if queue closed
+					if (queue && queue.state === "closed" && queue.confirmationMessageId) {
+						try {
+							const channel = bot.channels.cache.get(config.queueChannels[region]);
+							if (channel) {
+								const confirmationMessage = await channel.messages.fetch(queue.confirmationMessageId).catch(() => null);
+								if (confirmationMessage) {
+									await confirmationMessage.delete();
+								}
+							}
+							queue.confirmationMessageId = null;
+							queueManager.saveAllQueues();
+						} catch (error) {
+							console.error(`Error deleting confirmation message for ${region}:`, error.message);
+						}
+					}
+					
 					await updateQueueEmbed(region);
 					await interaction.reply({ content: `You are no longer active as a tester for the ${region} queue.`, ephemeral: true });
 				}
@@ -944,6 +1015,18 @@ bot.on("interactionCreate", async (interaction) => {
 				await interaction.showModal(modal);
 			} else if (customId.startsWith("joinQueue_")) {
 				const region = customId.split("_")[1];
+				
+				// Prevent testers from joining as players
+				if (interaction.member.roles.cache.has(config.testerRoleId)) {
+					return interaction.reply({ content: "Testers cannot join queues as players. Use `/q join` to activate as a tester instead.", ephemeral: true });
+				}
+				
+				// Check if user is an active tester in this region
+				const queue = queueManager.getQueue(region);
+				if (queue && queue.activeTesters.includes(interaction.user.id)) {
+					return interaction.reply({ content: "You are currently an active tester and cannot join the queue as a player.", ephemeral: true });
+				}
+				
 				const added = queueManager.addUser(region, interaction.user.id);
 				
 				if (added) {
@@ -971,7 +1054,7 @@ bot.on("interactionCreate", async (interaction) => {
 				} else {
 					await interaction.reply({ content: "⚠️ You were not in the previous queue, or you have already confirmed.", ephemeral: true });
 				}
-			} else if (customId.startsWith("ticketCancel_") || customId.startsWith("ticketSubmit_")) {
+			} else if (customId.startsWith("ticketCancel_")) {
 				const ticketId = customId.split("_")[1];
 				const ticket = ticketManager.getTicket(ticketId);
 				
@@ -979,24 +1062,100 @@ bot.on("interactionCreate", async (interaction) => {
 					return interaction.reply({ content: "Ticket not found.", ephemeral: true });
 				}
 				
-				// Check if user is the tester or the player
+				// Permission check: Only the tester or the player can cancel the ticket
 				if (interaction.user.id !== ticket.testerId && interaction.user.id !== ticket.userId) {
-					return interaction.reply({ content: "You don't have permission to close this ticket.", ephemeral: true });
+					return interaction.reply({ content: "You don't have permission to cancel this ticket. Only the tester or player can cancel it.", ephemeral: true });
 				}
 				
-				// Delete channel
+				// Check if channel still exists before trying to delete
 				try {
 					const channel = bot.channels.cache.get(ticket.channelId);
 					if (channel) {
-						await channel.delete();
+						try {
+							await channel.fetch();
+							await channel.delete();
+						} catch (fetchError) {
+							console.warn(`Could not access ticket channel ${ticket.channelId}:`, fetchError.message);
+						}
+					} else {
+						try {
+							const fetchedChannel = await bot.channels.fetch(ticket.channelId);
+							if (fetchedChannel) {
+								await fetchedChannel.delete();
+							}
+						} catch (fetchError) {
+							console.warn(`Ticket channel ${ticket.channelId} no longer exists:`, fetchError.message);
+						}
 					}
 				} catch (error) {
-					console.error("Error deleting ticket channel:", error.message);
+					console.warn(`Error deleting ticket channel ${ticket.channelId}:`, error.message);
 				}
 				
-				// Close ticket
+				// Close ticket (remove from data) regardless of whether channel deletion succeeded
 				ticketManager.closeTicket(ticketId);
-				await interaction.reply({ content: "Ticket closed.", ephemeral: true });
+				await interaction.reply({ content: "Ticket cancelled.", ephemeral: true });
+			} else if (customId.startsWith("ticketSubmit_")) {
+				const ticketId = customId.split("_")[1];
+				const ticket = ticketManager.getTicket(ticketId);
+				
+				if (!ticket) {
+					return interaction.reply({ content: "Ticket not found.", ephemeral: true });
+				}
+				
+				// Submit button: Only testers can press this
+				if (interaction.user.id !== ticket.testerId) {
+					return interaction.reply({ content: "Only the tester can submit this ticket.", ephemeral: true });
+				}
+				
+				// Remove player from waitlist and revoke channel permissions
+				const playerUserId = ticket.userId;
+				const removedUserData = waitlistManager.removeFromWaitlist(playerUserId, false);
+				
+				if (removedUserData && removedUserData.unlockedChannels) {
+					// Revoke channel permissions for all unlocked channels
+					for (const unlockedChannelId of removedUserData.unlockedChannels) {
+						try {
+							const unlockedChannel = bot.channels.cache.get(unlockedChannelId);
+							if (unlockedChannel) {
+								await unlockedChannel.permissionOverwrites.delete(playerUserId);
+							}
+						} catch (error) {
+							console.error(`Error revoking channel permissions for ${playerUserId} in ${unlockedChannelId}:`, error.message);
+						}
+					}
+				}
+				
+				// Set cooldown for the player
+				const cooldownDays = config.waitlistCooldownDays || 30;
+				waitlistManager.setCooldown(playerUserId, cooldownDays);
+				
+				// Check if channel still exists before trying to delete
+				try {
+					const channel = bot.channels.cache.get(ticket.channelId);
+					if (channel) {
+						try {
+							await channel.fetch();
+							await channel.delete();
+						} catch (fetchError) {
+							console.warn(`Could not access ticket channel ${ticket.channelId}:`, fetchError.message);
+						}
+					} else {
+						try {
+							const fetchedChannel = await bot.channels.fetch(ticket.channelId);
+							if (fetchedChannel) {
+								await fetchedChannel.delete();
+							}
+						} catch (fetchError) {
+							console.warn(`Ticket channel ${ticket.channelId} no longer exists:`, fetchError.message);
+						}
+					}
+				} catch (error) {
+					console.warn(`Error deleting ticket channel ${ticket.channelId}:`, error.message);
+				}
+				
+				// Close ticket (remove from data) regardless of whether channel deletion succeeded
+				ticketManager.closeTicket(ticketId);
+				await interaction.reply({ content: `Ticket submitted. Player has been removed from waitlist and will be on cooldown for ${cooldownDays} days.`, ephemeral: true });
 			}
 		} catch (error) {
 			console.error(`Error handling button ${customId}:`, error.message);
@@ -1019,11 +1178,17 @@ bot.on("interactionCreate", async (interaction) => {
 				return interaction.reply({ content: "Invalid region. Please enter EU, NA, or AS.", ephemeral: true });
 			}
 			
-			// Add to waitlist
-			const added = waitlistManager.addToWaitlist(interaction.user.id, region, preferredServer);
+			// Add to waitlist (with cooldown check)
+			const cooldownDays = config.waitlistCooldownDays || 30;
+			const result = waitlistManager.addToWaitlist(interaction.user.id, region, preferredServer, cooldownDays);
 			
-			if (!added) {
-				return interaction.reply({ content: "You are already in the waitlist.", ephemeral: true });
+			if (!result.success) {
+				if (result.reason === "already_in_waitlist") {
+					return interaction.reply({ content: "You are already in the waitlist.", ephemeral: true });
+				} else if (result.reason === "cooldown") {
+					return interaction.reply({ content: `You are on cooldown. You can join the waitlist again in ${result.daysRemaining} day(s).`, ephemeral: true });
+				}
+				return interaction.reply({ content: "Unable to join waitlist. Please try again later.", ephemeral: true });
 			}
 			
 			// Unlock region channel

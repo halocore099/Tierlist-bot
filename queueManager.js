@@ -62,6 +62,7 @@ function getQueue(region) {
 			state: "closed",
 			messageId: null,
 			confirmationMessageId: null,
+			pingMessageId: null, // Track ping notification messages
 			previousUsers: [],
 			confirmedUsers: [],
 			confirmationEndTime: null
@@ -316,6 +317,7 @@ function closeQueue(region) {
 	queue.state = "closed";
 	queue.confirmedUsers = [];
 	queue.confirmationEndTime = null;
+	queue.confirmationMessageId = null; // Clear confirmation message ID when closing
 	
 	markDataChanged();
 	saveAllQueues(true); // Force save on queue close
@@ -446,8 +448,8 @@ function buildQueueEmbed(region) {
 		const minutes = Math.floor(timeLeft / 60);
 		const seconds = timeLeft % 60;
 		
-		status = "⏳ **CONFIRMATION PERIOD**";
-		statusNote = `\n\n⏰ **${minutes}:${seconds.toString().padStart(2, '0')}** remaining to confirm you're still active!`;
+		status = "**CONFIRMATION PERIOD**";
+		statusNote = `\n\n**${minutes}:${seconds.toString().padStart(2, '0')}** remaining to confirm you're still active!`;
 		title = `${region} Queue - Confirmation Period`;
 		color = 0xFFA500; // Orange
 		
@@ -455,7 +457,7 @@ function buildQueueEmbed(region) {
 		const previousUsersList = queue.previousUsers.length > 0
 			? queue.previousUsers.map(pu => {
 				const isConfirmed = queue.confirmedUsers.includes(pu.userId);
-				return `${pu.position}. <@${pu.userId}> ${isConfirmed ? "✅" : "⏳"}`;
+				return `${pu.position}. <@${pu.userId}> ${isConfirmed ? "[Confirmed]" : "[Pending]"}`;
 			}).join("\n")
 			: "No previous users.";
 		
@@ -472,7 +474,7 @@ ${previousUsersList}
 		return embed;
 	} else if (queue.state === "closed") {
 		status = "🔴 **CLOSED**";
-		statusNote = "\n\n⚠️ *The queue is currently closed. No testers are available.*";
+		statusNote = "\n\n*The queue is currently closed. No testers are available.*";
 		title = `${region} Queue - Closed`;
 		color = 0xFF0000; // Red
 		
@@ -566,10 +568,33 @@ function buildConfirmationMessage(region) {
 	// Build mentions for all previous users
 	const mentions = queue.previousUsers.map(pu => `<@${pu.userId}>`).join(" ");
 	
+	// Count confirmed vs unconfirmed users
+	const confirmedCount = queue.confirmedUsers.length;
+	const totalCount = queue.previousUsers.length;
+	const unconfirmedCount = totalCount - confirmedCount;
+	
 	const embed = new EmbedBuilder()
 		.setTitle("Queue Reopened - Confirm You're Still Active")
-		.setDescription(`The ${region} queue has reopened! If you're still active, please click the button below within **${minutes}:${seconds.toString().padStart(2, '0')}** to keep your position in the queue.\n\n${mentions}`)
-		.setColor(0xFFA500);
+		.setDescription(`The **${region}** queue has reopened! Previous queue members need to confirm they're still active to keep their position.`)
+		.addFields(
+			{
+				name: "Time Remaining",
+				value: `**${minutes}:${seconds.toString().padStart(2, '0')}**`,
+				inline: true
+			},
+			{
+				name: "Confirmed",
+				value: `${confirmedCount}/${totalCount} players`,
+				inline: true
+			},
+			{
+				name: "Previous Queue Members",
+				value: mentions || "None",
+				inline: false
+			}
+		)
+		.setColor(0xFFA500)
+		.setFooter({ text: "Click the button below to confirm you're still active and keep your position in the queue." });
 	
 	const row = new ActionRowBuilder().addComponents(
 		new ButtonBuilder()
@@ -578,7 +603,7 @@ function buildConfirmationMessage(region) {
 			.setStyle(ButtonStyle.Success)
 	);
 	
-	return { embed, components: [row] };
+	return { embeds: [embed], components: [row] };
 }
 
 // ============================================================================

@@ -9,5 +9,6 @@
   "testerRoleId": "YOUR_TESTER_ROLE_ID",
   "pingRoleId": "YOUR_PING_ROLE_ID",
   "maxQueueSize": 20,
-  "confirmationGracePeriod": 5
+  "confirmationGracePeriod": 5,
+  "waitlistCooldownDays": 30
 }

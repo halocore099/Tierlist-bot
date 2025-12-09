@@ -80,6 +80,7 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
 - **`pingRoleId`**: Role ID to ping when queues open
 - **`maxQueueSize`**: Maximum number of players per queue (default: 20)
 - **`confirmationGracePeriod`**: Grace period in minutes for confirmation (default: 5)
+- **`waitlistCooldownDays`**: Cooldown period in days before players can rejoin waitlist after ticket submission (default: 30)
 
 ### How to Get Channel and Role IDs
 
@@ -191,6 +192,12 @@ For each region (EU, NA, AS):
 1. Run: `/setup grace-period minutes:5` (adjust as needed, default is 5 minutes)
 2. Changes are automatically saved to `config.json`
 
+### 6.7 Set Waitlist Cooldown (Optional)
+
+1. Run: `/setup waitlist-cooldown days:30` (adjust as needed, default is 30 days)
+2. Changes are automatically saved to `config.json`
+3. This sets how many days players must wait before rejoining the waitlist after a tester submits their ticket
+
 ## Step 7: Verify Setup
 
 1. **Check Waitlist Channel**:
@@ -265,7 +272,8 @@ Here's a complete example of a properly configured `config.json`:
   "testerRoleId": "1111222233334444555",
   "pingRoleId": "2222333344445555666",
   "maxQueueSize": 20,
-  "confirmationGracePeriod": 5
+  "confirmationGracePeriod": 5,
+  "waitlistCooldownDays": 30
 }
 ```
 

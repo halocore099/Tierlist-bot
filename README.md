@@ -7,10 +7,12 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 - **Waitlist System**: Players join a waitlist with modal registration, region selection, and preferred server info
 - **Region-Based Queues**: Separate queues for EU, NA, and AS regions
 - **Automatic Channel Unlocking**: Players unlock their region queue channel after joining the waitlist
+- **Waitlist Cooldown System**: Players who complete testing are placed on cooldown before they can rejoin the waitlist (configurable, default 30 days)
 - **Tester Management**: Testers can activate/deactivate queues using `/q join` and `/q leave`
 - **Tester Conflict Prevention**: Testers are automatically removed from waitlist/queues as players when they activate as testers
 - **Queue Retention System**: When queues close and reopen, players can confirm they're still active during a grace period
 - **Automatic Ticket Creation**: When a player reaches position 1, a private ticket channel is automatically created
+- **Ticket Submission**: Only testers can submit tickets, which removes players from waitlist and applies cooldown
 - **Persistent Data**: All data (waitlist, queues, tickets) survives bot restarts
 - **Graceful Shutdown**: Data is saved on shutdown, crashes, and periodically
 - **Rate Limiting and Debouncing**: Prevents button spam and reduces API calls
@@ -65,6 +67,7 @@ You have two options for setup:
    - `/setup ping-role <role>` - Sets ping role and saves to config.json
    - `/setup max-size <number>` - Sets max queue size and saves to config.json
    - `/setup grace-period <minutes>` - Sets grace period and saves to config.json
+   - `/setup waitlist-cooldown <days>` - Sets waitlist cooldown period and saves to config.json
 
 ### Method 2: Manual Configuration
 
@@ -107,6 +110,10 @@ For detailed command usage and examples, see [SETUP.md](docs/SETUP.md#step-6-ini
   - Example: `/setup grace-period minutes:5`
   - See [SETUP.md](docs/SETUP.md#66-set-grace-period-optional) for details
 
+- `/setup waitlist-cooldown <days>` - Set waitlist cooldown period (default: 30)
+  - Example: `/setup waitlist-cooldown days:30`
+  - See [SETUP.md](docs/SETUP.md#67-set-waitlist-cooldown-optional) for details
+
 ### Tester Commands
 
 - `/q join` - Join as active tester (opens queue if closed)
@@ -143,7 +150,9 @@ For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](d
    - When player reaches position 1, a private ticket channel is created
    - Only the player and tester can see the ticket channel
    - Tester can see player's region and preferred server
-   - After testing, tester clicks "Cancel" or "Submit" to close the ticket
+   - After testing:
+     - **Cancel**: Both tester and player can cancel (no cooldown applied)
+     - **Submit**: Only tester can submit (removes player from waitlist, revokes channel access, applies cooldown)
    - See [WORKFLOW.md](docs/WORKFLOW.md#testing-session) for details
 
 ### Tester Workflow
@@ -158,7 +167,9 @@ For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](d
    - Players join the queue
    - When a player reaches position 1, a ticket is automatically created
    - Tester tests the player in the ticket channel
-   - Tester clicks "Cancel" or "Submit" to close the ticket
+   - After testing:
+     - **Cancel**: Both tester and player can cancel (no cooldown applied)
+     - **Submit**: Only tester can submit (removes player from waitlist, revokes channel access, applies cooldown)
    - See [WORKFLOW.md](docs/WORKFLOW.md#daily-testing-workflow) for details
 
 3. **Deactivate Queue**:
@@ -206,6 +217,7 @@ The bot uses `config.json` for configuration. See `config.example.json` for a te
 **Optional Fields**:
 - `maxQueueSize`: Maximum players per queue (default: 20)
 - `confirmationGracePeriod`: Grace period in minutes for confirmation period (default: 5)
+- `waitlistCooldownDays`: Cooldown period in days before players can rejoin waitlist after submission (default: 30)
 
 For instructions on getting channel and role IDs, see [SETUP.md](docs/SETUP.md#how-to-get-channel-and-role-ids).
 
