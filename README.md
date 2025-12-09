@@ -181,44 +181,33 @@ When a queue closes with players in it:
 - After 5 minutes, confirmed players keep their positions (renumbered), unconfirmed players are removed
 - See [WORKFLOW.md](docs/WORKFLOW.md#confirmation-period-experience) for complete details
 
-## Configuration
+## Configuration File Reference
 
-The bot uses `config.json` for configuration. **The `token` field is REQUIRED** - the bot cannot start without it, regardless of which configuration method you use.
+The bot uses `config.json` for configuration. See `config.example.json` for a template.
 
-You can configure the bot in two ways:
+**Important**: The `token` field is **REQUIRED** - the bot cannot start without it.
 
-### Option 1: Use `/setup` Commands (Recommended)
+### Configuration Fields
 
-You can use the `/setup` commands in Discord to configure the bot:
-- `/setup waitlist <channel>` - Sets waitlist channel and creates embed
-- `/setup queue <region> <channel>` - Sets queue channel for a region and creates embed
-- `/setup tester-role <role>` - Sets tester role
-- `/setup ping-role <role>` - Sets ping role
-- `/setup max-size <number>` - Sets max queue size
-- `/setup grace-period <minutes>` - Sets confirmation grace period
-
-**Important**: 
-- The `token` field **must be in `config.json`** before starting the bot (cannot be set via `/setup` commands)
-- `/setup` commands automatically save changes to `config.json` - no manual editing needed!
-- Changes persist after bot restarts automatically
-
-### Option 2: Manual Configuration
-
-Alternatively, you can manually edit `config.json` directly. See `config.example.json` for the structure.
-
-**Required Fields** (must be in `config.json`):
+**Required Fields**:
 - `token`: Discord bot token (get from [Discord Developer Portal](https://discord.com/developers/applications)) - **REQUIRED to start bot**
 - `waitlistChannelId`: Channel ID for waitlist (right-click channel → Copy ID)
 - `queueChannels`: Object with EU, NA, AS channel IDs (right-click each channel → Copy ID)
+  ```json
+  "queueChannels": {
+    "EU": "channel_id_here",
+    "NA": "channel_id_here",
+    "AS": "channel_id_here"
+  }
+  ```
 - `testerRoleId`: Role ID for testers (right-click role → Copy ID)
 - `pingRoleId`: Role ID to ping when queue opens (right-click role → Copy ID)
 
 **Optional Fields**:
 - `maxQueueSize`: Maximum players per queue (default: 20)
-- `confirmationGracePeriod`: Grace period in minutes (default: 5)
+- `confirmationGracePeriod`: Grace period in minutes for confirmation period (default: 5)
 
-For detailed configuration instructions, see [SETUP.md](docs/SETUP.md#step-3-configure-the-bot).  
-See [SETUP.md](docs/SETUP.md#how-to-get-channel-and-role-ids) for instructions on getting IDs.
+For instructions on getting channel and role IDs, see [SETUP.md](docs/SETUP.md#how-to-get-channel-and-role-ids).
 
 ## Data Files
 
