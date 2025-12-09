@@ -7,6 +7,7 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 - **Waitlist System**: Players join a waitlist with modal registration, region selection, and preferred server info
 - **Region-Based Queues**: Separate queues for EU, NA, and AS regions
 - **Automatic Channel Unlocking**: Players unlock their region queue channel after joining the waitlist
+- **Automatic Role Assignment**: Players automatically receive the region-specific ping role when joining the waitlist (e.g., @EU Queue, @NA Queue, @AS Queue)
 - **Waitlist Cooldown System**: Players who complete testing are placed on cooldown before they can rejoin the waitlist (configurable, default 30 days)
 - **Tester Management**: Testers can activate/deactivate queues using `/q join` and `/q leave`
 - **Tester Conflict Prevention**: Testers are automatically removed from waitlist/queues as players when they activate as testers
@@ -57,14 +58,14 @@ You have two options for setup:
 ### Method 1: Using `/setup` Commands (Easier)
 
 1. Create channels for waitlist and queues (EU, NA, AS)
-2. Create roles for testers and ping notifications
+2. Create roles for testers and region-specific ping roles (one for each region: EU, NA, AS)
 3. **Create `config.json` with at minimum the `token` field** (required to start the bot)
 4. Start the bot
 5. Run `/setup` commands in Discord to configure everything (changes are automatically saved to `config.json`):
    - `/setup waitlist <channel>` - Creates waitlist embed and saves to config.json
    - `/setup queue <region> <channel>` - Creates queue embeds for each region and saves to config.json
    - `/setup tester-role <role>` - Sets tester role and saves to config.json
-   - `/setup ping-role <role>` - Sets ping role and saves to config.json
+   - `/setup ping-role <region> <role>` - Sets ping role for a specific region and saves to config.json (repeat for each region: EU, NA, AS)
    - `/setup max-size <number>` - Sets max queue size and saves to config.json
    - `/setup grace-period <minutes>` - Sets grace period and saves to config.json
    - `/setup waitlist-cooldown <days>` - Sets waitlist cooldown period and saves to config.json
@@ -72,7 +73,7 @@ You have two options for setup:
 ### Method 2: Manual Configuration
 
 1. Create channels for waitlist and queues (EU, NA, AS)
-2. Create roles for testers and ping notifications
+2. Create roles for testers and region-specific ping roles (one for each region: EU, NA, AS)
 3. Manually edit `config.json` with all required fields (including `token`)
 4. Start the bot - it will automatically create the embeds
 
@@ -97,9 +98,11 @@ For detailed command usage and examples, see [SETUP.md](docs/SETUP.md#step-6-ini
   - `<role>` can be a role mention (`@RoleName`) or role ID
   - See [SETUP.md](docs/SETUP.md#63-set-tester-role) for details
 
-- `/setup ping-role <role>` - Set role to ping when queue opens
-  - Example: `/setup ping-role role:@Queue Notifications` or `/setup ping-role role:1234567890123456789`
+- `/setup ping-role <region> <role>` - Set role to ping when queue opens for a specific region
+  - Example: `/setup ping-role region:EU role:@EU Queue` or `/setup ping-role region:NA role:1234567890123456789`
+  - `<region>` must be EU, NA, or AS
   - `<role>` can be a role mention (`@RoleName`) or role ID
+  - Players automatically receive this role when they join the waitlist for that region
   - See [SETUP.md](docs/SETUP.md#64-set-ping-role) for details
 
 - `/setup max-size <number>` - Set maximum queue size (default: 20)
@@ -124,6 +127,15 @@ For detailed command usage and examples, see [SETUP.md](docs/SETUP.md#step-6-ini
   - Must be used in a queue channel
   - Requires tester role
 
+### Admin Commands
+
+- `/clear all` - Clear all data (queues, waitlist, tickets, cooldowns)
+  - Requires administrator permissions
+  - Does NOT affect `config.json` - configuration remains unchanged
+- `/clear queues` - Clear all queue data only
+- `/clear waitlist` - Clear all waitlist data and cooldowns only
+- `/clear tickets` - Clear all ticket data only
+
 ## How It Works
 
 For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](docs/WORKFLOW.md).
@@ -137,6 +149,8 @@ For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](d
      - Preferred Server (text input)
    - Player submits the form
    - Region queue channel is unlocked for the player
+   - Player is automatically assigned the region-specific ping role (e.g., @EU Queue)
+   - Player will be notified when that region's queue opens
    - See [WORKFLOW.md](docs/WORKFLOW.md#joining-the-waitlist) for details
 
 2. **Join Queue**:
@@ -212,7 +226,16 @@ The bot uses `config.json` for configuration. See `config.example.json` for a te
   }
   ```
 - `testerRoleId`: Role ID for testers (right-click role → Copy ID)
-- `pingRoleId`: Role ID to ping when queue opens (right-click role → Copy ID)
+- `pingRoles`: Object with EU, NA, AS role IDs (right-click each role → Copy ID)
+  ```json
+  "pingRoles": {
+    "EU": "role_id_here",
+    "NA": "role_id_here",
+    "AS": "role_id_here"
+  }
+  ```
+  - Players automatically receive the corresponding region role when they join the waitlist
+  - These roles are pinged when their respective queues open
 
 **Optional Fields**:
 - `maxQueueSize`: Maximum players per queue (default: 20)

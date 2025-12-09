@@ -9,7 +9,7 @@
    - Queue state changes: **CLOSED** → **OPEN** (green)
    - Embed updates immediately showing tester in "Active Testers" section
    - "Join Queue" button becomes enabled for players
-   - Ping role is notified that the queue is open
+   - Region-specific ping role is notified that the queue is open (e.g., @EU Queue for EU queue)
 
 ### Daily Testing Workflow
 
@@ -97,10 +97,12 @@
    - If on cooldown: Error message showing days remaining until cooldown expires
    - If valid: Success!
 
-4. **Channel unlocked**:
+4. **Channel unlocked and role assigned**:
    - Player's region queue channel is unlocked
+   - Player is automatically assigned the region-specific ping role (e.g., @EU Queue, @NA Queue, @AS Queue)
    - Player can now see and access their region queue channel
-   - Player gets confirmation: "✅ You have joined the waitlist for [REGION]! The [REGION] queue channel has been unlocked for you."
+   - Player will be notified when that region's queue opens (via the ping role)
+   - Player gets confirmation: "✅ You have joined the waitlist for [REGION]! The [REGION] queue channel has been unlocked for you and you've been assigned the [REGION] queue role."
 
 ### Joining a Queue
 
@@ -195,6 +197,7 @@
 When a tester submits a ticket (clicks "Submit" button):
 - Player is automatically removed from the waitlist
 - Player's queue channel access is revoked (channel becomes hidden)
+- Player's region ping role is removed (no longer receives notifications for that region)
 - Player is placed on cooldown (default: 30 days, configurable)
 - Player cannot rejoin the waitlist until the cooldown expires
 - If player tries to join during cooldown, they'll see: "You are on cooldown. You can join the waitlist again in X day(s)."

@@ -610,6 +610,15 @@ function buildConfirmationMessage(region) {
 // EXPORTS
 // ============================================================================
 
+/**
+ * Clear all queue data
+ */
+function clearAllData() {
+	queues = {};
+	dataChanged = true;
+	saveAllQueues(true); // Force save
+}
+
 module.exports = {
 	initialize,
 	getQueue,
@@ -630,5 +639,6 @@ module.exports = {
 	hasConfirmationPeriodEnded,
 	buildQueueEmbed,
 	buildQueueButtons,
-	buildConfirmationMessage
+	buildConfirmationMessage,
+	clearAllData
 };

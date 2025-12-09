@@ -150,6 +150,14 @@ function getTicketByUser(userId) {
 // EXPORTS
 // ============================================================================
 
+/**
+ * Clear all ticket data
+ */
+function clearAllData() {
+	ticketData = { tickets: {} };
+	saveAllTickets();
+}
+
 module.exports = {
 	initialize,
 	saveAllTickets,
@@ -158,5 +166,6 @@ module.exports = {
 	getTicketByChannel,
 	getTicketByUser,
 	closeTicket,
-	getAllTickets
+	getAllTickets,
+	clearAllData
 };

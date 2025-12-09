@@ -188,6 +188,14 @@ function hasUnlockedRegion(userId, region) {
 // EXPORTS
 // ============================================================================
 
+/**
+ * Clear all waitlist data (users and cooldowns)
+ */
+function clearAllData() {
+	waitlistData = { users: {}, cooldowns: {} };
+	saveAllData();
+}
+
 module.exports = {
 	initialize,
 	saveAllData,
@@ -197,5 +205,6 @@ module.exports = {
 	hasUnlockedRegion,
 	removeFromWaitlist,
 	getAllUsers,
-	setCooldown
+	setCooldown,
+	clearAllData
 };

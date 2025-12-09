@@ -227,10 +227,10 @@ async function processConfirmationPeriod(region) {
 		// Update queue embed
 		await updateQueueEmbed(region);
 		
-		// Ping role that queue is open and track the message
+		// Ping region-specific role that queue is open and track the message
 		try {
-			if (channel && config.pingRoleId) {
-				const pingMessage = await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+			if (channel && config.pingRoles && config.pingRoles[region]) {
+				const pingMessage = await channel.send(`<@&${config.pingRoles[region]}> The ${region} queue is now open!`);
 				// Track ping message for cleanup
 				if (updatedQueue) {
 					updatedQueue.pingMessageId = pingMessage.id;
@@ -608,12 +608,23 @@ bot.on("clientReady", async () => {
 						{
 							type: ApplicationCommandOptionType.Subcommand,
 							name: "ping-role",
-							description: "Set role to ping when queue opens",
+							description: "Set role to ping when queue opens for a region",
 							options: [
+								{
+									type: ApplicationCommandOptionType.String,
+									name: "region",
+									description: "Region (EU, NA, AS)",
+									required: true,
+									choices: [
+										{ name: "EU", value: "EU" },
+										{ name: "NA", value: "NA" },
+										{ name: "AS", value: "AS" }
+									]
+								},
 								{
 									type: ApplicationCommandOptionType.Role,
 									name: "role",
-									description: "Role to ping",
+									description: "Role to ping for this region",
 									required: true
 								}
 							]
@@ -678,6 +689,32 @@ bot.on("clientReady", async () => {
 							type: ApplicationCommandOptionType.Subcommand,
 							name: "leave",
 							description: "Leave as tester (closes queue if last tester)"
+						}
+					]
+				},
+				{
+					name: "clear",
+					description: "Clear bot data (admin only)",
+					options: [
+						{
+							type: ApplicationCommandOptionType.Subcommand,
+							name: "all",
+							description: "Clear all data (queues, waitlist, tickets, cooldowns)"
+						},
+						{
+							type: ApplicationCommandOptionType.Subcommand,
+							name: "queues",
+							description: "Clear all queue data"
+						},
+						{
+							type: ApplicationCommandOptionType.Subcommand,
+							name: "waitlist",
+							description: "Clear all waitlist data and cooldowns"
+						},
+						{
+							type: ApplicationCommandOptionType.Subcommand,
+							name: "tickets",
+							description: "Clear all ticket data"
 						}
 					]
 				}
@@ -826,13 +863,18 @@ bot.on("interactionCreate", async (interaction) => {
 						await interaction.reply({ content: `⚠️ Tester role set to ${role.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
 					}
 				} else if (subcommand === "ping-role") {
+					const region = interaction.options.getString("region");
 					const role = interaction.options.getRole("role");
-					const saved = configManager.updateConfig("pingRoleId", role.id);
+					const configKey = `pingRoles.${region}`;
+					const saved = configManager.updateConfig(configKey, role.id);
 					if (saved) {
-						config.pingRoleId = role.id;
-						await interaction.reply({ content: `✅ Ping role set to ${role.name} and saved to config.json.`, ephemeral: true });
+						if (!config.pingRoles) {
+							config.pingRoles = {};
+						}
+						config.pingRoles[region] = role.id;
+						await interaction.reply({ content: `✅ ${region} ping role set to ${role.name} and saved to config.json.`, ephemeral: true });
 					} else {
-						await interaction.reply({ content: `⚠️ Ping role set to ${role.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+						await interaction.reply({ content: `⚠️ ${region} ping role set to ${role.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
 					}
 				} else if (subcommand === "max-size") {
 					const size = interaction.options.getInteger("size");
@@ -906,10 +948,10 @@ bot.on("interactionCreate", async (interaction) => {
 							}
 						}
 					} else if (queue.state === "open") {
-						// Ping role that queue is open and track the message
+						// Ping region-specific role that queue is open and track the message
 						const channel = bot.channels.cache.get(config.queueChannels[region]);
-						if (channel && config.pingRoleId) {
-							const pingMessage = await channel.send(`<@&${config.pingRoleId}> The ${region} queue is now open!`);
+						if (channel && config.pingRoles && config.pingRoles[region]) {
+							const pingMessage = await channel.send(`<@&${config.pingRoles[region]}> The ${region} queue is now open!`);
 							// Track ping message for cleanup
 							queue.pingMessageId = pingMessage.id;
 							queueManager.saveAllQueues();
@@ -963,6 +1005,29 @@ bot.on("interactionCreate", async (interaction) => {
 					
 					await updateQueueEmbed(region);
 					await interaction.reply({ content: `You are no longer active as a tester for the ${region} queue.`, ephemeral: true });
+				}
+			} else if (commandName === "clear") {
+				if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+					return interaction.reply({ content: "You do not have the required permissions.", ephemeral: true });
+				}
+				
+				const subcommand = interaction.options.getSubcommand();
+				
+				if (subcommand === "all") {
+					// Clear everything
+					queueManager.clearAllData();
+					waitlistManager.clearAllData();
+					ticketManager.clearAllData();
+					await interaction.reply({ content: "All data has been cleared (queues, waitlist, tickets, and cooldowns). Configuration remains unchanged.", ephemeral: true });
+				} else if (subcommand === "queues") {
+					queueManager.clearAllData();
+					await interaction.reply({ content: "All queue data has been cleared.", ephemeral: true });
+				} else if (subcommand === "waitlist") {
+					waitlistManager.clearAllData();
+					await interaction.reply({ content: "All waitlist data and cooldowns have been cleared.", ephemeral: true });
+				} else if (subcommand === "tickets") {
+					ticketManager.clearAllData();
+					await interaction.reply({ content: "All ticket data has been cleared.", ephemeral: true });
 				}
 			}
 		} catch (error) {
@@ -1111,16 +1176,34 @@ bot.on("interactionCreate", async (interaction) => {
 				const playerUserId = ticket.userId;
 				const removedUserData = waitlistManager.removeFromWaitlist(playerUserId, false);
 				
-				if (removedUserData && removedUserData.unlockedChannels) {
+				if (removedUserData) {
 					// Revoke channel permissions for all unlocked channels
-					for (const unlockedChannelId of removedUserData.unlockedChannels) {
+					if (removedUserData.unlockedChannels) {
+						for (const unlockedChannelId of removedUserData.unlockedChannels) {
+							try {
+								const unlockedChannel = bot.channels.cache.get(unlockedChannelId);
+								if (unlockedChannel) {
+									await unlockedChannel.permissionOverwrites.delete(playerUserId);
+								}
+							} catch (error) {
+								console.error(`Error revoking channel permissions for ${playerUserId} in ${unlockedChannelId}:`, error.message);
+							}
+						}
+					}
+					
+					// Remove region-specific ping role
+					if (removedUserData.region && config.pingRoles && config.pingRoles[removedUserData.region]) {
 						try {
-							const unlockedChannel = bot.channels.cache.get(unlockedChannelId);
-							if (unlockedChannel) {
-								await unlockedChannel.permissionOverwrites.delete(playerUserId);
+							const guild = interaction.guild;
+							const member = await guild.members.fetch(playerUserId).catch(() => null);
+							if (member) {
+								const role = guild.roles.cache.get(config.pingRoles[removedUserData.region]);
+								if (role) {
+									await member.roles.remove(role);
+								}
 							}
 						} catch (error) {
-							console.error(`Error revoking channel permissions for ${playerUserId} in ${unlockedChannelId}:`, error.message);
+							console.error(`Error removing ${removedUserData.region} ping role:`, error.message);
 						}
 					}
 				}
@@ -1191,7 +1274,7 @@ bot.on("interactionCreate", async (interaction) => {
 				return interaction.reply({ content: "Unable to join waitlist. Please try again later.", ephemeral: true });
 			}
 			
-			// Unlock region channel
+			// Unlock region channel and assign region role
 			const channelId = config.queueChannels[region];
 			if (channelId) {
 				try {
@@ -1207,7 +1290,20 @@ bot.on("interactionCreate", async (interaction) => {
 				}
 			}
 			
-			await interaction.reply({ content: `✅ You have joined the waitlist for ${region}! The ${region} queue channel has been unlocked for you.`, ephemeral: true });
+			// Assign region-specific ping role
+			if (config.pingRoles && config.pingRoles[region]) {
+				try {
+					const guild = interaction.guild;
+					const role = guild.roles.cache.get(config.pingRoles[region]);
+					if (role) {
+						await interaction.member.roles.add(role);
+					}
+				} catch (error) {
+					console.error(`Error assigning ${region} ping role:`, error.message);
+				}
+			}
+			
+			await interaction.reply({ content: `✅ You have joined the waitlist for ${region}! The ${region} queue channel has been unlocked for you and you've been assigned the ${region} queue role.`, ephemeral: true });
 		}
 	}
 });

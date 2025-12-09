@@ -46,8 +46,12 @@ function loadConfig() {
 			throw new Error("'testerRoleId' is required in config.json");
 		}
 		
-		if (!config.pingRoleId) {
-			throw new Error("'pingRoleId' is required in config.json");
+		if (!config.pingRoles || typeof config.pingRoles !== "object") {
+			throw new Error("'pingRoles' object is required in config.json");
+		}
+		
+		if (!config.pingRoles.EU || !config.pingRoles.NA || !config.pingRoles.AS) {
+			throw new Error("'pingRoles' must have EU, NA, and AS role IDs");
 		}
 		
 		// Set defaults for optional fields

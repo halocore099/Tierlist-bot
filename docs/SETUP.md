@@ -62,7 +62,11 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
        "AS": "YOUR_AS_QUEUE_CHANNEL_ID"
      },
      "testerRoleId": "YOUR_TESTER_ROLE_ID",
-     "pingRoleId": "YOUR_PING_ROLE_ID",
+     "pingRoles": {
+       "EU": "YOUR_EU_PING_ROLE_ID",
+       "NA": "YOUR_NA_PING_ROLE_ID",
+       "AS": "YOUR_AS_PING_ROLE_ID"
+     },
      "maxQueueSize": 20,
      "confirmationGracePeriod": 5
    }
@@ -77,7 +81,11 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
   - **`NA`**: Channel ID for the NA queue
   - **`AS`**: Channel ID for the AS queue
 - **`testerRoleId`**: Role ID for testers (users who can use `/q join`)
-- **`pingRoleId`**: Role ID to ping when queues open
+- **`pingRoles`**: Object containing role IDs to ping when each region's queue opens
+  - **`EU`**: Role ID for EU queue notifications (players get this role when joining EU waitlist)
+  - **`NA`**: Role ID for NA queue notifications (players get this role when joining NA waitlist)
+  - **`AS`**: Role ID for AS queue notifications (players get this role when joining AS waitlist)
+  - **Note**: Players automatically receive the corresponding region role when they join the waitlist for that region
 - **`maxQueueSize`**: Maximum number of players per queue (default: 20)
 - **`confirmationGracePeriod`**: Grace period in minutes for confirmation (default: 5)
 - **`waitlistCooldownDays`**: Cooldown period in days before players can rejoin waitlist after ticket submission (default: 30)
@@ -118,10 +126,12 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
    - This role allows users to use `/q join` and `/q leave`
    - Copy the role ID and add it to `config.json` as `testerRoleId`
 
-2. **Ping Role** (optional but recommended):
-   - Create a role (e.g., `Queue Notifications`)
-   - This role will be pinged when queues open
-   - Copy the role ID and add it to `config.json` as `pingRoleId`
+2. **Region Ping Roles** (one for each region - required):
+   - Create separate roles for each region (e.g., `EU Queue`, `NA Queue`, `AS Queue`)
+   - These roles will be pinged when their respective queues open
+   - **Important**: Players automatically receive the corresponding region role when they join the waitlist for that region
+   - When a tester submits a ticket, the player's region role is automatically removed
+   - Copy each role ID and add them to `config.json` under `pingRoles`
 
 ### Set Channel Permissions
 
@@ -177,10 +187,14 @@ For each region (EU, NA, AS):
 1. Run: `/setup tester-role role:@Tester` (replace @Tester with your tester role)
 2. Changes are automatically saved to `config.json`
 
-### 6.4 Set Ping Role
+### 6.4 Set Ping Roles
 
-1. Run: `/setup ping-role role:@Queue Notifications` (replace with your ping role)
+For each region (EU, NA, AS):
+
+1. Run: `/setup ping-role region:EU role:@EU Queue` (replace EU with NA or AS, and @EU Queue with your region-specific role)
 2. Changes are automatically saved to `config.json`
+3. Repeat for each region (EU, NA, AS)
+4. **Important**: Players automatically receive the corresponding region role when they join the waitlist for that region. This role is pinged when that region's queue opens.
 
 ### 6.5 Set Max Queue Size (Optional)
 
@@ -197,6 +211,27 @@ For each region (EU, NA, AS):
 1. Run: `/setup waitlist-cooldown days:30` (adjust as needed, default is 30 days)
 2. Changes are automatically saved to `config.json`
 3. This sets how many days players must wait before rejoining the waitlist after a tester submits their ticket
+
+## Step 8: Clear Bot Data (Admin Only)
+
+If you need to reset the bot's data without losing your configuration, you can use the `/clear` commands:
+
+### Clear Commands
+
+- **`/clear all`**: Clears all temporary data (queues, waitlist, tickets, cooldowns)
+  - This does NOT affect `config.json` - your configuration remains intact
+  - Use this to completely reset the bot state
+  
+- **`/clear queues`**: Clears only queue data
+  - Removes all players from queues, resets queue states
+  
+- **`/clear waitlist`**: Clears only waitlist data and cooldowns
+  - Removes all users from waitlist and clears all cooldowns
+  
+- **`/clear tickets`**: Clears only ticket data
+  - Removes all ticket records (note: this does not delete ticket channels, only the ticket records)
+
+**Important**: These commands require Administrator permissions and permanently delete the specified data. Use with caution!
 
 ## Step 7: Verify Setup
 
@@ -270,7 +305,11 @@ Here's a complete example of a properly configured `config.json`:
     "AS": "9988776655443322110"
   },
   "testerRoleId": "1111222233334444555",
-  "pingRoleId": "2222333344445555666",
+  "pingRoles": {
+    "EU": "2222333344445555666",
+    "NA": "3333444455556666777",
+    "AS": "4444555566667777888"
+  },
   "maxQueueSize": 20,
   "confirmationGracePeriod": 5,
   "waitlistCooldownDays": 30

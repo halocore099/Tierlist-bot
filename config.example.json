@@ -7,7 +7,11 @@
     "AS": "YOUR_AS_QUEUE_CHANNEL_ID"
   },
   "testerRoleId": "YOUR_TESTER_ROLE_ID",
-  "pingRoleId": "YOUR_PING_ROLE_ID",
+  "pingRoles": {
+    "EU": "YOUR_EU_PING_ROLE_ID",
+    "NA": "YOUR_NA_PING_ROLE_ID",
+    "AS": "YOUR_AS_PING_ROLE_ID"
+  },
   "maxQueueSize": 20,
   "confirmationGracePeriod": 5,
   "waitlistCooldownDays": 30
