@@ -1,0 +1,10 @@
+node_modules/
+config.json
+queue-data.json
+queue-data.json.tmp
+waitlist-data.json
+waitlist-data.json.tmp
+tickets-data.json
+tickets-data.json.tmp
+*.log
+

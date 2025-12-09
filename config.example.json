@@ -1,5 +1,13 @@
 {
-  "token": "Enter discord token here",
-  "roleID": "Enter role tester ID here",
-  "channelID": "Enter channel to send queue embed"
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "waitlistChannelId": "YOUR_WAITLIST_CHANNEL_ID",
+  "queueChannels": {
+    "EU": "YOUR_EU_QUEUE_CHANNEL_ID",
+    "NA": "YOUR_NA_QUEUE_CHANNEL_ID",
+    "AS": "YOUR_AS_QUEUE_CHANNEL_ID"
+  },
+  "testerRoleId": "YOUR_TESTER_ROLE_ID",
+  "pingRoleId": "YOUR_PING_ROLE_ID",
+  "maxQueueSize": 20,
+  "confirmationGracePeriod": 5
 }
