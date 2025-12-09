@@ -760,50 +760,75 @@ bot.on("interactionCreate", async (interaction) => {
 				
 				if (subcommand === "waitlist") {
 					const channel = interaction.options.getChannel("channel");
-					config.waitlistChannelId = channel.id;
-					// Note: In a real implementation, you'd save this to config.json
-					await interaction.reply({ content: `Waitlist channel set to ${channel.name}. Please update config.json manually.`, ephemeral: true });
-					await setupWaitlistEmbed();
+					const saved = configManager.updateConfig("waitlistChannelId", channel.id);
+					if (saved) {
+						config.waitlistChannelId = channel.id;
+						await setupWaitlistEmbed();
+						await interaction.reply({ content: `✅ Waitlist channel set to ${channel.name} and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Waitlist channel set to ${channel.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				} else if (subcommand === "queue") {
 					const region = interaction.options.getString("region");
 					const channel = interaction.options.getChannel("channel");
-					if (!config.queueChannels) {
-						config.queueChannels = {};
+					const configKey = `queueChannels.${region}`;
+					const saved = configManager.updateConfig(configKey, channel.id);
+					if (saved) {
+						if (!config.queueChannels) {
+							config.queueChannels = {};
+						}
+						config.queueChannels[region] = channel.id;
+						
+						// Create queue embed if it doesn't exist
+						const queue = queueManager.getQueue(region);
+						if (!queue.messageId) {
+							const embed = queueManager.buildQueueEmbed(region);
+							const buttons = queueManager.buildQueueButtons(region);
+							const message = await channel.send({ embeds: [embed], components: buttons });
+							queue.messageId = message.id;
+							queueManager.saveAllQueues();
+						}
+						
+						await interaction.reply({ content: `✅ ${region} queue channel set to ${channel.name} and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ ${region} queue channel set to ${channel.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
 					}
-					config.queueChannels[region] = channel.id;
-					// Note: In a real implementation, you'd save this to config.json
-					
-					// Create queue embed if it doesn't exist
-					const queue = queueManager.getQueue(region);
-					if (!queue.messageId) {
-						const embed = queueManager.buildQueueEmbed(region);
-						const buttons = queueManager.buildQueueButtons(region);
-						const message = await channel.send({ embeds: [embed], components: buttons });
-						queue.messageId = message.id;
-						queueManager.saveAllQueues();
-					}
-					
-					await interaction.reply({ content: `${region} queue channel set to ${channel.name}. Please update config.json manually.`, ephemeral: true });
 				} else if (subcommand === "tester-role") {
 					const role = interaction.options.getRole("role");
-					config.testerRoleId = role.id;
-					// Note: In a real implementation, you'd save this to config.json
-					await interaction.reply({ content: `Tester role set to ${role.name}. Please update config.json manually.`, ephemeral: true });
+					const saved = configManager.updateConfig("testerRoleId", role.id);
+					if (saved) {
+						config.testerRoleId = role.id;
+						await interaction.reply({ content: `✅ Tester role set to ${role.name} and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Tester role set to ${role.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				} else if (subcommand === "ping-role") {
 					const role = interaction.options.getRole("role");
-					config.pingRoleId = role.id;
-					// Note: In a real implementation, you'd save this to config.json
-					await interaction.reply({ content: `Ping role set to ${role.name}. Please update config.json manually.`, ephemeral: true });
+					const saved = configManager.updateConfig("pingRoleId", role.id);
+					if (saved) {
+						config.pingRoleId = role.id;
+						await interaction.reply({ content: `✅ Ping role set to ${role.name} and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Ping role set to ${role.name}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				} else if (subcommand === "max-size") {
 					const size = interaction.options.getInteger("size");
-					config.maxQueueSize = size;
-					// Note: In a real implementation, you'd save this to config.json
-					await interaction.reply({ content: `Max queue size set to ${size}. Please update config.json manually.`, ephemeral: true });
+					const saved = configManager.updateConfig("maxQueueSize", size);
+					if (saved) {
+						config.maxQueueSize = size;
+						await interaction.reply({ content: `✅ Max queue size set to ${size} and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Max queue size set to ${size}, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				} else if (subcommand === "grace-period") {
 					const minutes = interaction.options.getInteger("minutes");
-					config.confirmationGracePeriod = minutes;
-					// Note: In a real implementation, you'd save this to config.json
-					await interaction.reply({ content: `Confirmation grace period set to ${minutes} minutes. Please update config.json manually.`, ephemeral: true });
+					const saved = configManager.updateConfig("confirmationGracePeriod", minutes);
+					if (saved) {
+						config.confirmationGracePeriod = minutes;
+						await interaction.reply({ content: `✅ Confirmation grace period set to ${minutes} minutes and saved to config.json.`, ephemeral: true });
+					} else {
+						await interaction.reply({ content: `⚠️ Confirmation grace period set to ${minutes} minutes, but failed to save to config.json. Please update it manually.`, ephemeral: true });
+					}
 				}
 			} else if (commandName === "q") {
 				const subcommand = interaction.options.getSubcommand();

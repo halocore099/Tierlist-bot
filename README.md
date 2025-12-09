@@ -4,14 +4,17 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 
 ## Features
 
-- **Waitlist System**: Players join a waitlist with region selection and preferred server info
+- **Waitlist System**: Players join a waitlist with modal registration, region selection, and preferred server info
 - **Region-Based Queues**: Separate queues for EU, NA, and AS regions
-- **Channel Unlocking**: Players unlock their region queue channel after joining the waitlist
+- **Automatic Channel Unlocking**: Players unlock their region queue channel after joining the waitlist
 - **Tester Management**: Testers can activate/deactivate queues using `/q join` and `/q leave`
-- **Queue Retention**: When queues close and reopen, players can confirm they're still active
-- **Automatic Ticket Creation**: When a player reaches position 1, a private ticket channel is created
-- **Persistent Data**: All data survives bot restarts
+- **Tester Conflict Prevention**: Testers are automatically removed from waitlist/queues as players when they activate as testers
+- **Queue Retention System**: When queues close and reopen, players can confirm they're still active during a grace period
+- **Automatic Ticket Creation**: When a player reaches position 1, a private ticket channel is automatically created
+- **Persistent Data**: All data (waitlist, queues, tickets) survives bot restarts
 - **Graceful Shutdown**: Data is saved on shutdown, crashes, and periodically
+- **Rate Limiting and Debouncing**: Prevents button spam and reduces API calls
+- **Batched Embed Updates**: Efficient embed updates to reduce Discord API usage
 
 ## Installation
 
@@ -45,11 +48,30 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 
 ## Quick Setup
 
+**Important**: The bot token is **REQUIRED** in `config.json` regardless of which setup method you choose. The bot cannot start without it.
+
+You have two options for setup:
+
+### Method 1: Using `/setup` Commands (Easier)
+
 1. Create channels for waitlist and queues (EU, NA, AS)
 2. Create roles for testers and ping notifications
-3. Configure `config.json` with all IDs
-4. Run `/setup` commands in Discord to initialize embeds
-5. Update `config.json` manually (commands will remind you)
+3. **Create `config.json` with at minimum the `token` field** (required to start the bot)
+4. Start the bot
+5. Run `/setup` commands in Discord to configure everything (changes are automatically saved to `config.json`):
+   - `/setup waitlist <channel>` - Creates waitlist embed and saves to config.json
+   - `/setup queue <region> <channel>` - Creates queue embeds for each region and saves to config.json
+   - `/setup tester-role <role>` - Sets tester role and saves to config.json
+   - `/setup ping-role <role>` - Sets ping role and saves to config.json
+   - `/setup max-size <number>` - Sets max queue size and saves to config.json
+   - `/setup grace-period <minutes>` - Sets grace period and saves to config.json
+
+### Method 2: Manual Configuration
+
+1. Create channels for waitlist and queues (EU, NA, AS)
+2. Create roles for testers and ping notifications
+3. Manually edit `config.json` with all required fields (including `token`)
+4. Start the bot - it will automatically create the embeds
 
 For detailed setup instructions with step-by-step guidance, see [SETUP.md](docs/SETUP.md).
 
@@ -161,12 +183,31 @@ When a queue closes with players in it:
 
 ## Configuration
 
-The bot uses `config.json` for configuration. See `config.example.json` for the structure.
+The bot uses `config.json` for configuration. **The `token` field is REQUIRED** - the bot cannot start without it, regardless of which configuration method you use.
 
-For detailed configuration instructions, see [SETUP.md](docs/SETUP.md#step-3-configure-the-bot).
+You can configure the bot in two ways:
 
-**Required Fields**:
-- `token`: Discord bot token (get from [Discord Developer Portal](https://discord.com/developers/applications))
+### Option 1: Use `/setup` Commands (Recommended)
+
+You can use the `/setup` commands in Discord to configure the bot:
+- `/setup waitlist <channel>` - Sets waitlist channel and creates embed
+- `/setup queue <region> <channel>` - Sets queue channel for a region and creates embed
+- `/setup tester-role <role>` - Sets tester role
+- `/setup ping-role <role>` - Sets ping role
+- `/setup max-size <number>` - Sets max queue size
+- `/setup grace-period <minutes>` - Sets confirmation grace period
+
+**Important**: 
+- The `token` field **must be in `config.json`** before starting the bot (cannot be set via `/setup` commands)
+- `/setup` commands automatically save changes to `config.json` - no manual editing needed!
+- Changes persist after bot restarts automatically
+
+### Option 2: Manual Configuration
+
+Alternatively, you can manually edit `config.json` directly. See `config.example.json` for the structure.
+
+**Required Fields** (must be in `config.json`):
+- `token`: Discord bot token (get from [Discord Developer Portal](https://discord.com/developers/applications)) - **REQUIRED to start bot**
 - `waitlistChannelId`: Channel ID for waitlist (right-click channel → Copy ID)
 - `queueChannels`: Object with EU, NA, AS channel IDs (right-click each channel → Copy ID)
 - `testerRoleId`: Role ID for testers (right-click role → Copy ID)
@@ -176,6 +217,7 @@ For detailed configuration instructions, see [SETUP.md](docs/SETUP.md#step-3-con
 - `maxQueueSize`: Maximum players per queue (default: 20)
 - `confirmationGracePeriod`: Grace period in minutes (default: 5)
 
+For detailed configuration instructions, see [SETUP.md](docs/SETUP.md#step-3-configure-the-bot).  
 See [SETUP.md](docs/SETUP.md#how-to-get-channel-and-role-ids) for instructions on getting IDs.
 
 ## Data Files
@@ -186,19 +228,6 @@ The bot creates and manages these data files:
 - `tickets-data.json`: Active ticket information
 
 All data is automatically saved and persists across bot restarts.
-
-## Features
-
-- ✅ Waitlist system with modal registration
-- ✅ Region-based queues (EU, NA, AS)
-- ✅ Automatic channel unlocking
-- ✅ Tester conflict prevention (testers can't be in queues as players)
-- ✅ Queue retention with confirmation period
-- ✅ Automatic ticket creation
-- ✅ Graceful shutdown handling
-- ✅ Periodic backup saves
-- ✅ Rate limiting and debouncing
-- ✅ Batched embed updates
 
 ## Documentation
 

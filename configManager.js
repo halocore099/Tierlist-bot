@@ -94,6 +94,58 @@ function getAllConfig() {
 	return config;
 }
 
+/**
+ * Save configuration to config.json
+ * @returns {boolean} True if saved successfully
+ */
+function saveConfig() {
+	try {
+		// Safety check: never save if token is missing (prevents accidental token loss)
+		if (!config || !config.token) {
+			console.error("⚠️ Cannot save config: token is missing. This prevents accidental token loss.");
+			return false;
+		}
+		
+		const fs = require("fs");
+		const jsonData = JSON.stringify(config, null, 2);
+		fs.writeFileSync("config.json", jsonData, "utf-8");
+		console.log("✓ Config saved to config.json");
+		return true;
+	} catch (error) {
+		console.error("Error saving config.json:", error.message);
+		return false;
+	}
+}
+
+/**
+ * Update a configuration value and save to file
+ * @param {string} key - Configuration key (supports dot notation for nested keys like "queueChannels.EU")
+ * @param {*} value - Value to set
+ * @returns {boolean} True if updated and saved successfully
+ */
+function updateConfig(key, value) {
+	if (!config) {
+		loadConfig();
+	}
+	
+	// Handle nested keys like "queueChannels.EU"
+	if (key.includes(".")) {
+		const keys = key.split(".");
+		let obj = config;
+		for (let i = 0; i < keys.length - 1; i++) {
+			if (!obj[keys[i]]) {
+				obj[keys[i]] = {};
+			}
+			obj = obj[keys[i]];
+		}
+		obj[keys[keys.length - 1]] = value;
+	} else {
+		config[key] = value;
+	}
+	
+	return saveConfig();
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -101,5 +153,7 @@ function getAllConfig() {
 module.exports = {
 	loadConfig,
 	getConfig,
-	getAllConfig
+	getAllConfig,
+	saveConfig,
+	updateConfig
 };
