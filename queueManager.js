@@ -1,11 +1,24 @@
 "use strict";
 
+// ============================================================================
+// IMPORTS & DEPENDENCIES
+// ============================================================================
+
 const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require("discord.js");
 const path = require("path");
 const { saveDataAtomic, loadDataAtomic } = require("./persistence-util");
 const configManager = require("./configManager");
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const DATA_FILE = path.join(__dirname, "queue-data.json");
+const SAVE_DEBOUNCE_MS = 2000; // Save at most every 2 seconds (unless forced)
+
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
 
 // Queue structure: { EU: { users: [], activeTesters: [], state: "closed"|"open"|"confirmation_period", messageId, confirmationMessageId, previousUsers: [], confirmedUsers: [], confirmationEndTime: null }, ... }
 let queues = {};
@@ -13,7 +26,10 @@ let queues = {};
 // Persistence optimization: track if data has changed
 let dataChanged = false;
 let lastSaveTime = 0;
-const SAVE_DEBOUNCE_MS = 2000; // Save at most every 2 seconds (unless forced)
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
 /**
  * Initialize queue manager and load persisted data
@@ -28,6 +44,10 @@ function initialize() {
 		queues = {};
 	}
 }
+
+// ============================================================================
+// QUEUE GETTERS
+// ============================================================================
 
 /**
  * Get queue for a region
@@ -68,6 +88,17 @@ function isQueueOpen(region) {
 	return queue.state === "open";
 }
 
+// ============================================================================
+// PERSISTENCE
+// ============================================================================
+
+/**
+ * Mark data as changed (for optimized persistence)
+ */
+function markDataChanged() {
+	dataChanged = true;
+}
+
 /**
  * Save queue data to file (with debouncing)
  * @param {boolean} force - Force save immediately (bypass debounce)
@@ -87,12 +118,9 @@ function saveAllQueues(force = false) {
 	}
 }
 
-/**
- * Mark data as changed (for optimized persistence)
- */
-function markDataChanged() {
-	dataChanged = true;
-}
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
 
 /**
  * Add user to queue
@@ -196,6 +224,10 @@ function removeNextUser(region) {
 	return removedUser;
 }
 
+// ============================================================================
+// TESTER MANAGEMENT
+// ============================================================================
+
 /**
  * Set tester as active
  * @param {string} region - Region
@@ -250,6 +282,10 @@ function setTesterInactive(region, testerId) {
 	return queue.activeTesters.length !== initialLength;
 }
 
+// ============================================================================
+// QUEUE STATE MANAGEMENT
+// ============================================================================
+
 /**
  * Open queue
  * @param {string} region - Region
@@ -284,6 +320,10 @@ function closeQueue(region) {
 	markDataChanged();
 	saveAllQueues(true); // Force save on queue close
 }
+
+// ============================================================================
+// CONFIRMATION PERIOD MANAGEMENT
+// ============================================================================
 
 /**
  * Start confirmation period
@@ -386,6 +426,10 @@ function hasConfirmationPeriodEnded(region) {
 	return Date.now() >= queue.confirmationEndTime;
 }
 
+// ============================================================================
+// EMBED BUILDERS
+// ============================================================================
+
 /**
  * Build queue embed
  * @param {string} region - Region
@@ -485,7 +529,6 @@ function buildQueueButtons(region) {
 	
 	const isOpen = queue.state === "open";
 	const isConfirmationPeriod = queue.state === "confirmation_period";
-	const isClosed = queue.state === "closed";
 	
 	const row = new ActionRowBuilder();
 	
@@ -537,6 +580,10 @@ function buildConfirmationMessage(region) {
 	
 	return { embed, components: [row] };
 }
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 module.exports = {
 	initialize,

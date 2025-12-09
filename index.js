@@ -1,6 +1,9 @@
 "use strict";
 
-// Dependencies
+// ============================================================================
+// IMPORTS & DEPENDENCIES
+// ============================================================================
+
 const { 
 	Client, 
 	GatewayIntentBits, 
@@ -19,7 +22,10 @@ const waitlistManager = require("./waitlistManager");
 const queueManager = require("./queueManager");
 const ticketManager = require("./ticketManager");
 
-// Load config
+// ============================================================================
+// CONFIGURATION & INITIALIZATION
+// ============================================================================
+
 let config;
 try {
 	config = configManager.loadConfig();
@@ -42,13 +48,33 @@ waitlistManager.initialize();
 queueManager.initialize();
 ticketManager.initialize();
 
-// Rate limiting for button clicks
-const buttonRateLimits = new Map();
-const BUTTON_RATE_LIMIT_MS = 1000;
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
-// Debounce for "Still Active" button (longer cooldown)
-const confirmActiveDebounce = new Map();
+const BUTTON_RATE_LIMIT_MS = 1000;
 const CONFIRM_ACTIVE_DEBOUNCE_MS = 5000; // 5 seconds
+const CONFIRMATION_UPDATE_INTERVAL = 3000; // 3 seconds
+const REGIONS = ["EU", "NA", "AS"];
+
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
+
+// Rate limiting
+const buttonRateLimits = new Map();
+const confirmActiveDebounce = new Map();
+
+// Confirmation period management
+const confirmationTimers = new Map();
+const confirmationUpdateQueues = new Map(); // region -> { needsUpdate: boolean, lastUpdate: number }
+
+// Shutdown flag
+let isShuttingDown = false;
+
+// ============================================================================
+// RATE LIMITING FUNCTIONS
+// ============================================================================
 
 function isRateLimited(userId) {
 	const lastClick = buttonRateLimits.get(userId);
@@ -70,126 +96,65 @@ function updateConfirmActiveDebounce(userId) {
 	confirmActiveDebounce.set(userId, Date.now());
 }
 
-// Confirmation period timers
-const confirmationTimers = new Map();
-
-// Batch confirmation message updates (update every 3 seconds instead of on every click)
-const confirmationUpdateQueues = new Map(); // region -> { needsUpdate: boolean, lastUpdate: number }
-const CONFIRMATION_UPDATE_INTERVAL = 3000; // 3 seconds
-
-// Graceful shutdown flag
-let isShuttingDown = false;
+// ============================================================================
+// QUEUE EMBED MANAGEMENT
+// ============================================================================
 
 /**
- * Graceful shutdown function
+ * Update queue embed for a region
  */
-async function gracefulShutdown() {
-	if (isShuttingDown) return;
-	isShuttingDown = true;
-	
-	console.log("\n🛑 Shutting down gracefully...");
-	
+async function updateQueueEmbed(region) {
 	try {
-		// Save all data (force save to flush any pending changes)
-		queueManager.saveAllQueues(true); // Force save
-		waitlistManager.saveAllData();
-		ticketManager.saveAllTickets();
-		console.log("✓ All data saved successfully.");
+		const queue = queueManager.getQueue(region);
+		if (!queue) {
+			return;
+		}
+		
+		const channelId = config.queueChannels?.[region];
+		if (!channelId) {
+			return;
+		}
+		
+		const channel = bot.channels.cache.get(channelId);
+		if (!channel) {
+			return;
+		}
+		
+		const embed = queueManager.buildQueueEmbed(region);
+		const buttons = queueManager.buildQueueButtons(region);
+		
+		if (queue.messageId) {
+			// Try to update existing message
+			const message = await channel.messages.fetch(queue.messageId).catch(() => null);
+			if (message) {
+				await message.edit({ embeds: [embed], components: buttons });
+				return;
+			}
+			// Message was deleted, create new one
+			queue.messageId = null;
+		}
+		
+		// Create new message if it doesn't exist
+		const message = await channel.send({ embeds: [embed], components: buttons });
+		queue.messageId = message.id;
+		queueManager.saveAllQueues();
 	} catch (error) {
-		console.error("Error saving data on shutdown:", error.message);
+		console.error(`Error updating queue embed for ${region}:`, error.message);
 	}
-	
-	try {
-		bot.destroy();
-		console.log("✓ Discord client disconnected.");
-	} catch (error) {
-		console.error("Error disconnecting Discord client:", error.message);
-	}
-	
-	process.exit(0);
 }
 
-// Register shutdown handlers
-process.on("SIGINT", gracefulShutdown);
-process.on("SIGTERM", gracefulShutdown);
+// ============================================================================
+// CONFIRMATION PERIOD MANAGEMENT
+// ============================================================================
 
-process.on("uncaughtException", (error) => {
-	console.error("Uncaught Exception:", error);
-	try {
-		queueManager.saveAllQueues(true); // Force save
-		waitlistManager.saveAllData();
-		ticketManager.saveAllTickets();
-	} catch (saveError) {
-		console.error("Error saving data on exception:", saveError.message);
-	}
-	gracefulShutdown();
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-	console.error("Unhandled Rejection at:", promise, "reason:", reason);
-	try {
-		queueManager.saveAllQueues(true); // Force save
-		waitlistManager.saveAllData();
-		ticketManager.saveAllTickets();
-	} catch (saveError) {
-		console.error("Error saving data on rejection:", saveError.message);
-	}
-});
-
-process.on("exit", () => {
-	try {
-		queueManager.saveAllQueues(true); // Force save
-		waitlistManager.saveAllData();
-		ticketManager.saveAllTickets();
-	} catch (error) {
-		console.error("Error saving data on exit:", error.message);
-	}
-});
-
-// Periodic backup saves (every 30 seconds) - also flushes any pending queue changes
-setInterval(() => {
-	try {
-		queueManager.saveAllQueues(true); // Force save to flush pending changes
-		waitlistManager.saveAllData();
-		ticketManager.saveAllTickets();
-	} catch (error) {
-		console.error("Error in periodic backup save:", error.message);
-	}
-}, 30 * 1000);
-
-// Check confirmation periods periodically
-setInterval(() => {
-	try {
-		const regions = ["EU", "NA", "AS"];
-		for (const region of regions) {
-			if (queueManager.hasConfirmationPeriodEnded(region)) {
-				processConfirmationPeriod(region);
-			}
-		}
-	} catch (error) {
-		console.error("Error checking confirmation periods:", error.message);
-	}
-}, 1000); // Check every second
-
-// Batch update confirmation messages
-setInterval(async () => {
-	try {
-		const regions = ["EU", "NA", "AS"];
-		for (const region of regions) {
-			const updateInfo = confirmationUpdateQueues.get(region);
-			if (updateInfo && updateInfo.needsUpdate) {
-				const now = Date.now();
-				if (now - updateInfo.lastUpdate >= CONFIRMATION_UPDATE_INTERVAL) {
-					await updateConfirmationMessage(region);
-					updateInfo.needsUpdate = false;
-					updateInfo.lastUpdate = now;
-				}
-			}
-		}
-	} catch (error) {
-		console.error("Error in confirmation message batch update:", error.message);
-	}
-}, 1000); // Check every second
+/**
+ * Mark confirmation message as needing update (batched)
+ */
+function markConfirmationUpdateNeeded(region) {
+	const updateInfo = confirmationUpdateQueues.get(region) || { needsUpdate: false, lastUpdate: 0 };
+	updateInfo.needsUpdate = true;
+	confirmationUpdateQueues.set(region, updateInfo);
+}
 
 /**
  * Update confirmation message (batched)
@@ -223,15 +188,6 @@ async function updateConfirmationMessage(region) {
 	} catch (error) {
 		console.error(`Error updating confirmation message for ${region}:`, error.message);
 	}
-}
-
-/**
- * Mark confirmation message as needing update (batched)
- */
-function markConfirmationUpdateNeeded(region) {
-	const updateInfo = confirmationUpdateQueues.get(region) || { needsUpdate: false, lastUpdate: 0 };
-	updateInfo.needsUpdate = true;
-	confirmationUpdateQueues.set(region, updateInfo);
 }
 
 /**
@@ -281,48 +237,303 @@ async function processConfirmationPeriod(region) {
 	}
 }
 
+// ============================================================================
+// WAITLIST MANAGEMENT
+// ============================================================================
+
 /**
- * Update queue embed
+ * Setup waitlist embed
  */
-async function updateQueueEmbed(region) {
+async function setupWaitlistEmbed() {
 	try {
-		const queue = queueManager.getQueue(region);
-		if (!queue) {
-			return;
-		}
-		
-		const channelId = config.queueChannels?.[region];
+		const channelId = config.waitlistChannelId;
 		if (!channelId) {
 			return;
 		}
 		
 		const channel = bot.channels.cache.get(channelId);
 		if (!channel) {
+			console.error("Waitlist channel not found");
 			return;
 		}
 		
-		const embed = queueManager.buildQueueEmbed(region);
-		const buttons = queueManager.buildQueueButtons(region);
+		// Look for existing waitlist message
+		const messages = await channel.messages.fetch({ limit: 10 });
+		let waitlistMessage = messages.find(m => 
+			m.author.id === bot.user.id && 
+			m.embeds.length > 0 && 
+			m.embeds[0].title && 
+			m.embeds[0].title.includes("Waitlist")
+		);
 		
-		if (queue.messageId) {
-			// Try to update existing message
-			const message = await channel.messages.fetch(queue.messageId).catch(() => null);
-			if (message) {
-				await message.edit({ embeds: [embed], components: buttons });
-				return;
-			}
-			// Message was deleted, create new one
-			queue.messageId = null;
+		const embed = new EmbedBuilder()
+			.setTitle("Join Waitlist")
+			.setDescription("Click the button below to join the waitlist and unlock your region queue channel.")
+			.setColor(0x0099FF);
+		
+		const button = new ButtonBuilder()
+			.setCustomId("joinWaitlist")
+			.setLabel("Join Waitlist")
+			.setStyle(ButtonStyle.Primary);
+		
+		const row = new ActionRowBuilder().addComponents(button);
+		
+		if (waitlistMessage) {
+			await waitlistMessage.edit({ embeds: [embed], components: [row] });
+		} else {
+			await channel.send({ embeds: [embed], components: [row] });
 		}
-		
-		// Create new message if it doesn't exist
-		const message = await channel.send({ embeds: [embed], components: buttons });
-		queue.messageId = message.id;
-		queueManager.saveAllQueues();
 	} catch (error) {
-		console.error(`Error updating queue embed for ${region}:`, error.message);
+		console.error("Error setting up waitlist embed:", error.message);
 	}
 }
+
+// ============================================================================
+// GRACEFUL SHUTDOWN
+// ============================================================================
+
+/**
+ * Graceful shutdown function
+ */
+async function gracefulShutdown() {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+	
+	console.log("\n🛑 Shutting down gracefully...");
+	
+	try {
+		// Save all data (force save to flush any pending changes)
+		queueManager.saveAllQueues(true);
+		waitlistManager.saveAllData();
+		ticketManager.saveAllTickets();
+		console.log("✓ All data saved successfully.");
+	} catch (error) {
+		console.error("Error saving data on shutdown:", error.message);
+	}
+	
+	try {
+		bot.destroy();
+		console.log("✓ Discord client disconnected.");
+	} catch (error) {
+		console.error("Error disconnecting Discord client:", error.message);
+	}
+	
+	process.exit(0);
+}
+
+// Register shutdown handlers
+process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", gracefulShutdown);
+
+process.on("uncaughtException", (error) => {
+	console.error("Uncaught Exception:", error);
+	try {
+		queueManager.saveAllQueues(true);
+		waitlistManager.saveAllData();
+		ticketManager.saveAllTickets();
+	} catch (saveError) {
+		console.error("Error saving data on exception:", saveError.message);
+	}
+	gracefulShutdown();
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+	console.error("Unhandled Rejection at:", promise, "reason:", reason);
+	try {
+		queueManager.saveAllQueues(true);
+		waitlistManager.saveAllData();
+		ticketManager.saveAllTickets();
+	} catch (saveError) {
+		console.error("Error saving data on rejection:", saveError.message);
+	}
+});
+
+process.on("exit", () => {
+	try {
+		queueManager.saveAllQueues(true);
+		waitlistManager.saveAllData();
+		ticketManager.saveAllTickets();
+	} catch (error) {
+		console.error("Error saving data on exit:", error.message);
+	}
+});
+
+// ============================================================================
+// PERIODIC TASKS
+// ============================================================================
+
+// Periodic backup saves (every 30 seconds) - also flushes any pending queue changes
+setInterval(() => {
+	try {
+		queueManager.saveAllQueues(true);
+		waitlistManager.saveAllData();
+		ticketManager.saveAllTickets();
+	} catch (error) {
+		console.error("Error in periodic backup save:", error.message);
+	}
+}, 30 * 1000);
+
+// Check confirmation periods periodically
+setInterval(() => {
+	try {
+		for (const region of REGIONS) {
+			if (queueManager.hasConfirmationPeriodEnded(region)) {
+				processConfirmationPeriod(region);
+			}
+		}
+	} catch (error) {
+		console.error("Error checking confirmation periods:", error.message);
+	}
+}, 1000); // Check every second
+
+// Batch update confirmation messages
+setInterval(async () => {
+	try {
+		for (const region of REGIONS) {
+			const updateInfo = confirmationUpdateQueues.get(region);
+			if (updateInfo && updateInfo.needsUpdate) {
+				const now = Date.now();
+				if (now - updateInfo.lastUpdate >= CONFIRMATION_UPDATE_INTERVAL) {
+					await updateConfirmationMessage(region);
+					updateInfo.needsUpdate = false;
+					updateInfo.lastUpdate = now;
+				}
+			}
+		}
+	} catch (error) {
+		console.error("Error in confirmation message batch update:", error.message);
+	}
+}, 1000); // Check every second
+
+// Update queue embeds periodically
+setInterval(async () => {
+	try {
+		for (const region of REGIONS) {
+			await updateQueueEmbed(region);
+		}
+	} catch (error) {
+		console.error("Error in queue update interval:", error.message);
+	}
+}, 10 * 1000); // Update every 10 seconds
+
+// Handle when a player reaches position 1 - create ticket
+setInterval(async () => {
+	try {
+		for (const region of REGIONS) {
+			const queue = queueManager.getQueue(region);
+			if (queue.state !== "open" || queue.users.length === 0) {
+				continue;
+			}
+			
+			// Check if there's a user at position 1
+			const nextUser = queueManager.getNextUser(region);
+			if (!nextUser) {
+				continue;
+			}
+			
+			// Check if ticket already exists for this user
+			const existingTicket = ticketManager.getTicketByUser(nextUser.userId);
+			if (existingTicket) {
+				continue; // Ticket already exists
+			}
+			
+			// Get user data from waitlist
+			const userData = waitlistManager.getUserData(nextUser.userId);
+			if (!userData) {
+				continue; // User not in waitlist (shouldn't happen, but handle gracefully)
+			}
+			
+			// Get an active tester
+			if (queue.activeTesters.length === 0) {
+				continue; // No active testers
+			}
+			
+			const testerId = queue.activeTesters[0]; // Use first active tester
+			
+			// Remove user from queue
+			queueManager.removeNextUser(region);
+			
+			// Create ticket channel
+			try {
+				const channelId = config.queueChannels[region];
+				const queueChannel = bot.channels.cache.get(channelId);
+				if (!queueChannel) {
+					continue;
+				}
+				
+				const guild = queueChannel.guild;
+				const category = queueChannel.parent;
+				
+				// Create private channel
+				const ticketChannel = await guild.channels.create({
+					name: `ticket-${nextUser.userId}`,
+					type: 0, // Text channel
+					parent: category ? category.id : null,
+					permissionOverwrites: [
+						{
+							id: guild.id,
+							deny: [PermissionFlagsBits.ViewChannel]
+						},
+						{
+							id: nextUser.userId,
+							allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
+						},
+						{
+							id: config.testerRoleId,
+							allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
+						}
+					]
+				});
+				
+				// Create ticket
+				const ticketId = ticketManager.createTicket(
+					nextUser.userId,
+					testerId,
+					region,
+					userData.preferredServer,
+					ticketChannel.id
+				);
+				
+				// Send ticket embed
+				const embed = new EmbedBuilder()
+					.setTitle("Testing Session")
+					.addFields(
+						{ name: "Player", value: `<@${nextUser.userId}>`, inline: true },
+						{ name: "Region", value: region, inline: true },
+						{ name: "Preferred Server", value: userData.preferredServer, inline: true },
+						{ name: "Tester", value: `<@${testerId}>`, inline: true }
+					)
+					.setColor(0x0099FF);
+				
+				const cancelButton = new ButtonBuilder()
+					.setCustomId(`ticketCancel_${ticketId}`)
+					.setLabel("Cancel")
+					.setStyle(ButtonStyle.Danger);
+				
+				const submitButton = new ButtonBuilder()
+					.setCustomId(`ticketSubmit_${ticketId}`)
+					.setLabel("Submit")
+					.setStyle(ButtonStyle.Success);
+				
+				const row = new ActionRowBuilder().addComponents(cancelButton, submitButton);
+				
+				await ticketChannel.send({ embeds: [embed], components: [row] });
+				await ticketChannel.send(`<@${nextUser.userId}> <@${testerId}> Testing session started.`);
+				
+				// Update queue embed
+				await updateQueueEmbed(region);
+			} catch (error) {
+				console.error(`Error creating ticket for ${nextUser.userId}:`, error.message);
+			}
+		}
+	} catch (error) {
+		console.error("Error in ticket creation interval:", error.message);
+	}
+}, 5 * 1000); // Check every 5 seconds
+
+// ============================================================================
+// DISCORD EVENT HANDLERS
+// ============================================================================
 
 // Bot ready event
 bot.on("ready", async () => {
@@ -452,8 +663,7 @@ bot.on("ready", async () => {
 		}
 		
 		// Restore queue embeds on startup
-		const regions = ["EU", "NA", "AS"];
-		for (const region of regions) {
+		for (const region of REGIONS) {
 			const queue = queueManager.getQueue(region);
 			const channelId = config.queueChannels?.[region];
 			
@@ -534,55 +744,9 @@ bot.on("ready", async () => {
 	}
 });
 
-/**
- * Setup waitlist embed
- */
-async function setupWaitlistEmbed() {
-	try {
-		const channelId = config.waitlistChannelId;
-		if (!channelId) {
-			return;
-		}
-		
-		const channel = bot.channels.cache.get(channelId);
-		if (!channel) {
-			console.error("Waitlist channel not found");
-			return;
-		}
-		
-		// Look for existing waitlist message
-		const messages = await channel.messages.fetch({ limit: 10 });
-		let waitlistMessage = messages.find(m => 
-			m.author.id === bot.user.id && 
-			m.embeds.length > 0 && 
-			m.embeds[0].title && 
-			m.embeds[0].title.includes("Waitlist")
-		);
-		
-		const embed = new EmbedBuilder()
-			.setTitle("Join Waitlist")
-			.setDescription("Click the button below to join the waitlist and unlock your region queue channel.")
-			.setColor(0x0099FF);
-		
-		const button = new ButtonBuilder()
-			.setCustomId("joinWaitlist")
-			.setLabel("Join Waitlist")
-			.setStyle(ButtonStyle.Primary);
-		
-		const row = new ActionRowBuilder().addComponents(button);
-		
-		if (waitlistMessage) {
-			await waitlistMessage.edit({ embeds: [embed], components: [row] });
-		} else {
-			await channel.send({ embeds: [embed], components: [row] });
-		}
-	} catch (error) {
-		console.error("Error setting up waitlist embed:", error.message);
-	}
-}
-
-// Command handlers
+// Interaction handlers
 bot.on("interactionCreate", async (interaction) => {
+	// Command handlers
 	if (interaction.isCommand()) {
 		const { commandName } = interaction;
 		
@@ -664,8 +828,7 @@ bot.on("interactionCreate", async (interaction) => {
 					const removedWaitlistData = waitlistManager.removeFromWaitlist(interaction.user.id, hasTesterRole);
 					
 					// Remove from all queues as a player
-					const regions = ["EU", "NA", "AS"];
-					for (const r of regions) {
+					for (const r of REGIONS) {
 						queueManager.removeUser(r, interaction.user.id);
 					}
 					
@@ -714,7 +877,10 @@ bot.on("interactionCreate", async (interaction) => {
 				// Interaction may have already been replied to
 			}
 		}
-	} else if (interaction.isButton()) {
+	}
+	
+	// Button handlers
+	else if (interaction.isButton()) {
 		// Rate limiting
 		if (isRateLimited(interaction.user.id)) {
 			return interaction.reply({ content: "⏳ Please wait a moment before clicking again.", ephemeral: true });
@@ -815,7 +981,10 @@ bot.on("interactionCreate", async (interaction) => {
 				// Interaction may have already been replied to
 			}
 		}
-	} else if (interaction.isModalSubmit()) {
+	}
+	
+	// Modal handlers
+	else if (interaction.isModalSubmit()) {
 		if (interaction.customId === "waitlistModal") {
 			const region = interaction.fields.getTextInputValue("regionInput").toUpperCase().trim();
 			const preferredServer = interaction.fields.getTextInputValue("serverInput").trim();
@@ -853,134 +1022,6 @@ bot.on("interactionCreate", async (interaction) => {
 	}
 });
 
-// Update queue embeds periodically
-setInterval(async () => {
-	try {
-		const regions = ["EU", "NA", "AS"];
-		for (const region of regions) {
-			await updateQueueEmbed(region);
-		}
-	} catch (error) {
-		console.error("Error in queue update interval:", error.message);
-	}
-}, 10 * 1000); // Update every 10 seconds
-
-// Handle when a player reaches position 1 - create ticket
-setInterval(async () => {
-	try {
-		const regions = ["EU", "NA", "AS"];
-		for (const region of regions) {
-			const queue = queueManager.getQueue(region);
-			if (queue.state !== "open" || queue.users.length === 0) {
-				continue;
-			}
-			
-			// Check if there's a user at position 1
-			const nextUser = queueManager.getNextUser(region);
-			if (!nextUser) {
-				continue;
-			}
-			
-			// Check if ticket already exists for this user
-			const existingTicket = ticketManager.getTicketByUser(nextUser.userId);
-			if (existingTicket) {
-				continue; // Ticket already exists
-			}
-			
-			// Get user data from waitlist
-			const userData = waitlistManager.getUserData(nextUser.userId);
-			if (!userData) {
-				continue; // User not in waitlist (shouldn't happen, but handle gracefully)
-			}
-			
-			// Get an active tester
-			if (queue.activeTesters.length === 0) {
-				continue; // No active testers
-			}
-			
-			const testerId = queue.activeTesters[0]; // Use first active tester
-			
-			// Remove user from queue
-			queueManager.removeNextUser(region);
-			
-			// Create ticket channel
-			try {
-				const channelId = config.queueChannels[region];
-				const queueChannel = bot.channels.cache.get(channelId);
-				if (!queueChannel) {
-					continue;
-				}
-				
-				const guild = queueChannel.guild;
-				const category = queueChannel.parent;
-				
-				// Create private channel
-				const ticketChannel = await guild.channels.create({
-					name: `ticket-${nextUser.userId}`,
-					type: 0, // Text channel
-					parent: category ? category.id : null,
-					permissionOverwrites: [
-						{
-							id: guild.id,
-							deny: [PermissionFlagsBits.ViewChannel]
-						},
-						{
-							id: nextUser.userId,
-							allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
-						},
-						{
-							id: config.testerRoleId,
-							allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
-						}
-					]
-				});
-				
-				// Create ticket
-				const ticketId = ticketManager.createTicket(
-					nextUser.userId,
-					testerId,
-					region,
-					userData.preferredServer,
-					ticketChannel.id
-				);
-				
-				// Send ticket embed
-				const embed = new EmbedBuilder()
-					.setTitle("Testing Session")
-					.addFields(
-						{ name: "Player", value: `<@${nextUser.userId}>`, inline: true },
-						{ name: "Region", value: region, inline: true },
-						{ name: "Preferred Server", value: userData.preferredServer, inline: true },
-						{ name: "Tester", value: `<@${testerId}>`, inline: true }
-					)
-					.setColor(0x0099FF);
-				
-				const cancelButton = new ButtonBuilder()
-					.setCustomId(`ticketCancel_${ticketId}`)
-					.setLabel("Cancel")
-					.setStyle(ButtonStyle.Danger);
-				
-				const submitButton = new ButtonBuilder()
-					.setCustomId(`ticketSubmit_${ticketId}`)
-					.setLabel("Submit")
-					.setStyle(ButtonStyle.Success);
-				
-				const row = new ActionRowBuilder().addComponents(cancelButton, submitButton);
-				
-				await ticketChannel.send({ embeds: [embed], components: [row] });
-				await ticketChannel.send(`<@${nextUser.userId}> <@${testerId}> Testing session started.`);
-				
-				// Update queue embed
-				await updateQueueEmbed(region);
-			} catch (error) {
-				console.error(`Error creating ticket for ${nextUser.userId}:`, error.message);
-			}
-		}
-	} catch (error) {
-		console.error("Error in ticket creation interval:", error.message);
-	}
-}, 5 * 1000); // Check every 5 seconds
-
 // Error handling
 bot.on("error", (error) => {
 	console.error("Discord bot error:", error.message);
@@ -990,7 +1031,10 @@ bot.on("warn", (warning) => {
 	console.warn("Discord bot warning:", warning);
 });
 
-// Login
+// ============================================================================
+// BOT LOGIN
+// ============================================================================
+
 try {
 	bot.login(config.token);
 } catch (error) {

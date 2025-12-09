@@ -1,12 +1,28 @@
 "use strict";
 
+// ============================================================================
+// IMPORTS & DEPENDENCIES
+// ============================================================================
+
 const path = require("path");
 const { saveDataAtomic, loadDataAtomic } = require("./persistence-util");
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const DATA_FILE = path.join(__dirname, "waitlist-data.json");
+
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
 
 // Waitlist data structure: { users: { userId: { userId, region, preferredServer, unlockedChannels: [] } } }
 let waitlistData = { users: {} };
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
 /**
  * Initialize waitlist manager and load persisted data
@@ -22,6 +38,10 @@ function initialize() {
 	}
 }
 
+// ============================================================================
+// PERSISTENCE
+// ============================================================================
+
 /**
  * Save waitlist data to file
  */
@@ -32,6 +52,10 @@ function saveAllData() {
 		console.error("Error saving waitlist data:", error.message);
 	}
 }
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
 
 /**
  * Add user to waitlist
@@ -66,6 +90,43 @@ function getUserData(userId) {
 }
 
 /**
+ * Get all waitlist users
+ * @returns {Object} All waitlist users
+ */
+function getAllUsers() {
+	return waitlistData.users;
+}
+
+/**
+ * Remove user from waitlist
+ * @param {string} userId - User ID
+ * @param {boolean} preserveChannelPermissions - If true, don't revoke channel permissions (for testers)
+ * @returns {Object|null} User data if removed, null if not found
+ */
+function removeFromWaitlist(userId, preserveChannelPermissions = false) {
+	const userData = waitlistData.users[userId];
+	if (!userData) {
+		return null;
+	}
+	
+	// Store unlocked channels before removing (needed for permission cleanup)
+	const unlockedChannels = preserveChannelPermissions ? [] : userData.unlockedChannels;
+	
+	delete waitlistData.users[userId];
+	saveAllData();
+	
+	// Return user data with unlocked channels for permission cleanup
+	return {
+		...userData,
+		unlockedChannels: unlockedChannels
+	};
+}
+
+// ============================================================================
+// CHANNEL MANAGEMENT
+// ============================================================================
+
+/**
  * Unlock region channel for user
  * @param {string} userId - User ID
  * @param {string} channelId - Channel ID to unlock
@@ -96,38 +157,9 @@ function hasUnlockedRegion(userId, region) {
 	return userData.region === region;
 }
 
-/**
- * Remove user from waitlist
- * @param {string} userId - User ID
- * @param {boolean} preserveChannelPermissions - If true, don't revoke channel permissions (for testers)
- * @returns {Object|null} User data if removed, null if not found
- */
-function removeFromWaitlist(userId, preserveChannelPermissions = false) {
-	const userData = waitlistData.users[userId];
-	if (!userData) {
-		return null;
-	}
-	
-	// Store unlocked channels before removing (needed for permission cleanup)
-	const unlockedChannels = preserveChannelPermissions ? [] : userData.unlockedChannels;
-	
-	delete waitlistData.users[userId];
-	saveAllData();
-	
-	// Return user data with unlocked channels for permission cleanup
-	return {
-		...userData,
-		unlockedChannels: unlockedChannels
-	};
-}
-
-/**
- * Get all waitlist users
- * @returns {Object} All waitlist users
- */
-function getAllUsers() {
-	return waitlistData.users;
-}
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 module.exports = {
 	initialize,
@@ -139,4 +171,3 @@ module.exports = {
 	removeFromWaitlist,
 	getAllUsers
 };
-

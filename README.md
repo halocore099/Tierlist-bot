@@ -1,82 +1,176 @@
-# PVP Tierlist
-PVP Tierlist Discord bot for managing testing queues across different game modes.
+# Discord Waitlist Queue Bot
+
+A Discord bot for managing region-based testing queues with a waitlist system. Players join a waitlist, unlock their region queue channel, and can join queues when testers are active.
+
+## Features
+
+- **Waitlist System**: Players join a waitlist with region selection and preferred server info
+- **Region-Based Queues**: Separate queues for EU, NA, and AS regions
+- **Channel Unlocking**: Players unlock their region queue channel after joining the waitlist
+- **Tester Management**: Testers can activate/deactivate queues using `/q join` and `/q leave`
+- **Queue Retention**: When queues close and reopen, players can confirm they're still active
+- **Automatic Ticket Creation**: When a player reaches position 1, a private ticket channel is created
+- **Persistent Data**: All data survives bot restarts
+- **Graceful Shutdown**: Data is saved on shutdown, crashes, and periodically
 
 ## Installation
-Github:
-```
-git clone https://github.com/Soapdevs/Tierlist-bot.git
-```
 
-NpmJS:
-```
-npm i discord.js@14.14.1
-```
+### Prerequisites
 
-## Setup
-1. Copy `config.example.json` to `config.json`
-2. Add your Discord bot token
-3. Optionally set a `defaultRoleID` for testers (can also be set per queue)
+- Node.js (v16.9.0 or higher)
+- A Discord Bot Application ([Discord Developer Portal](https://discord.com/developers/applications))
 
-## Usage
-```
-node index.js
-```
+### Steps
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Soapdevs/Tierlist-bot.git
+   cd Tierlist-bot
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install discord.js@14.14.1
+   ```
+
+3. **Configure the bot**:
+   - Copy `config.example.json` to `config.json`
+   - Fill in your bot token, channel IDs, and role IDs
+   - See [SETUP.md](docs/SETUP.md) for detailed setup instructions
+
+4. **Start the bot**:
+   ```bash
+   node index.js
+   ```
+
+## Quick Setup
+
+1. Create channels for waitlist and queues (EU, NA, AS)
+2. Create roles for testers and ping notifications
+3. Configure `config.json` with all IDs
+4. Run `/setup` commands in Discord to initialize embeds
+5. Update `config.json` manually (commands will remind you)
+
+For detailed setup instructions, see [SETUP.md](docs/SETUP.md).
 
 ## Commands
 
-### `/createqueue name [role]`
-- **Admin only** - Creates a new queue with an embed in the current channel
-- The embed starts in **offline** mode
-- `name`: Name of the queue (e.g., "speed-sword", "sword")
-- `role`: (Optional) Tester role ID. Uses default from config if not provided
+### Setup Commands (Admin Only)
 
-### `/testqueue join queuename`
-- Allows a tester to join a queue
-- Requires the tester role for that queue
-- Testers can then toggle their availability
+- `/setup waitlist <channel>` - Set the waitlist channel
+- `/setup queue <region> <channel>` - Set queue channel for a region (EU, NA, or AS)
+- `/setup tester-role <role>` - Set the tester role
+- `/setup ping-role <role>` - Set role to ping when queue opens
+- `/setup max-size <number>` - Set maximum queue size (default: 20)
+- `/setup grace-period <minutes>` - Set confirmation grace period (default: 5)
 
-### `/stopqueue name`
-- **Admin only** - Deletes a queue and its embed
+### Tester Commands
 
-### `/remove queuename user`
-- **Admin only** - Removes a user from a specific queue
+- `/q join` - Join as active tester (opens queue if closed)
+  - Must be used in a queue channel (EU, NA, or AS)
+  - Requires tester role
+  - Automatically removes tester from waitlist/queues as a player
+- `/q leave` - Leave as tester (closes queue if last tester)
+  - Must be used in a queue channel
+  - Requires tester role
 
-## Workflow
+## How It Works
 
-1. **Create Queue**: Admin uses `/createqueue "speed-sword"` in a channel
-   - Embed appears in **offline** mode (red)
-   - No testers yet
+### Player Workflow
 
-2. **Tester Joins**: Tester uses `/testqueue join "speed-sword"`
-   - Tester is added to the queue
-   - Embed switches to **online** mode (green) if tester is available
+1. **Join Waitlist**:
+   - Player clicks "Join Waitlist" button in waitlist channel
+   - Modal appears asking for:
+     - Region (EU, NA, or AS)
+     - Preferred Server (text input)
+   - Player submits the form
+   - Region queue channel is unlocked for the player
 
-3. **Players Join**: Players click "Join Queue" button on the embed
-   - Only works when queue is online
+2. **Join Queue**:
+   - Player goes to their region queue channel
+   - When a tester is active (`/q join`), the queue opens
+   - Player clicks "Join Queue" button
+   - Player is added to the queue
 
-4. **Testing**: Tester tests players in queue
+3. **Testing**:
+   - When player reaches position 1, a private ticket channel is created
+   - Only the player and tester can see the ticket channel
+   - Tester can see player's region and preferred server
+   - After testing, tester clicks "Cancel" or "Submit" to close the ticket
 
-5. **Close Queue**: Tester clicks "Close Queue" button
-   - Queue goes to **offline** mode
-   - All positions are saved
+### Tester Workflow
 
-6. **Reopen Queue**: When tester becomes available again
-   - If there are previous queue members, **retention period** starts (2 minutes)
-   - Previous members are mentioned and can click "Retain Position"
-   - After 2 minutes, retained users move to front, queue opens to everyone
+1. **Activate Queue**:
+   - Tester goes to a queue channel (EU, NA, or AS)
+   - Tester runs `/q join`
+   - Queue opens and ping role is notified
+
+2. **Testing**:
+   - Players join the queue
+   - When a player reaches position 1, a ticket is automatically created
+   - Tester tests the player in the ticket channel
+   - Tester clicks "Cancel" or "Submit" to close the ticket
+
+3. **Deactivate Queue**:
+   - Tester runs `/q leave`
+   - If last tester, queue closes and player positions are saved
+
+### Queue States
+
+- **Closed** 🔴: No active testers, players cannot join
+- **Open** 🟢: Active testers available, players can join
+- **Confirmation Period** ⏳: Queue reopening, previous players have 5 minutes to confirm they're still active
+
+### Queue Retention System
+
+When a queue closes with players in it:
+- Player positions are saved
+- When queue reopens, a confirmation period starts (5 minutes)
+- Previous players are pinged and can click "Still Active" button
+- After 5 minutes, confirmed players keep their positions (renumbered), unconfirmed players are removed
+
+## Configuration
+
+The bot uses `config.json` for configuration. See `config.example.json` for the structure.
+
+**Required Fields**:
+- `token`: Discord bot token
+- `waitlistChannelId`: Channel ID for waitlist
+- `queueChannels`: Object with EU, NA, AS channel IDs
+- `testerRoleId`: Role ID for testers
+- `pingRoleId`: Role ID to ping when queue opens
+
+**Optional Fields**:
+- `maxQueueSize`: Maximum players per queue (default: 20)
+- `confirmationGracePeriod`: Grace period in minutes (default: 5)
+
+## Data Files
+
+The bot creates and manages these data files:
+- `waitlist-data.json`: Waitlist user data
+- `queue-data.json`: Queue state and positions
+- `tickets-data.json`: Active ticket information
+
+All data is automatically saved and persists across bot restarts.
 
 ## Features
-- Name-based queues (not channel-based)
-- Persistent embeds (always visible, toggle offline/online)
-- Tester availability system
-- Queue inactivity system (users must click "Keep Spot" every 2 minutes)
-- Retention period system (2 minutes to retain position when queue reopens)
-- Automatic persistence (queues survive bot restarts)
-- Automatic queue reorganization after retention period
-- Real-time embed updates (no waiting for intervals)
-- Rate limiting (prevents button spam)
-- Autocomplete for queue names
-- Automatic message/channel recovery
 
-## Detailed Workflows
-See [WORKFLOW.md](WORKFLOW.md) for complete tester and player experience workflows.
+- ✅ Waitlist system with modal registration
+- ✅ Region-based queues (EU, NA, AS)
+- ✅ Automatic channel unlocking
+- ✅ Tester conflict prevention (testers can't be in queues as players)
+- ✅ Queue retention with confirmation period
+- ✅ Automatic ticket creation
+- ✅ Graceful shutdown handling
+- ✅ Periodic backup saves
+- ✅ Rate limiting and debouncing
+- ✅ Batched embed updates
+
+## Documentation
+
+- **[SETUP.md](docs/SETUP.md)** - Detailed setup guide
+- **[WORKFLOW.md](docs/WORKFLOW.md)** - Complete workflow documentation
+
+## License
+
+See [LICENSE](LICENSE) file for details.
