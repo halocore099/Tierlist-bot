@@ -137,12 +137,12 @@ For each **queue channel** (EU, NA, AS):
 
 2. You should see:
    ```
-   ✓ Config loaded successfully
+   Config loaded successfully
    Loaded 0 waitlist user(s) from persistence.
    Loaded 0 queue(s) from persistence.
    Loaded 0 ticket(s) from persistence.
    Discord Waitlist Queue Bot is running.
-   ✓ Commands registered for guild: YourServerName
+   Commands registered for guild: YourServerName
    ```
 
 3. If you see errors, check:
@@ -160,7 +160,7 @@ Once the bot is running, use the `/setup` commands to configure it:
 1. Go to your waitlist channel
 2. Run: `/setup waitlist channel:#waitlist`
 3. The bot will create a waitlist embed with a "Join Waitlist" button
-4. **Important**: Update `config.json` manually with the channel ID (the command will remind you)
+4. Changes are automatically saved to `config.json`
 
 ### 6.2 Set Queue Channels
 
@@ -169,27 +169,27 @@ For each region (EU, NA, AS):
 1. Go to the queue channel for that region
 2. Run: `/setup queue region:EU channel:#queue-eu` (replace EU with NA or AS as needed)
 3. The bot will create a queue embed in that channel
-4. **Important**: Update `config.json` manually with the channel IDs
+4. Changes are automatically saved to `config.json`
 
 ### 6.3 Set Tester Role
 
 1. Run: `/setup tester-role role:@Tester` (replace @Tester with your tester role)
-2. **Important**: Update `config.json` manually with the role ID
+2. Changes are automatically saved to `config.json`
 
 ### 6.4 Set Ping Role
 
 1. Run: `/setup ping-role role:@Queue Notifications` (replace with your ping role)
-2. **Important**: Update `config.json` manually with the role ID
+2. Changes are automatically saved to `config.json`
 
 ### 6.5 Set Max Queue Size (Optional)
 
 1. Run: `/setup max-size size:20` (adjust as needed, default is 20)
-2. **Important**: Update `config.json` manually
+2. Changes are automatically saved to `config.json`
 
 ### 6.6 Set Grace Period (Optional)
 
 1. Run: `/setup grace-period minutes:5` (adjust as needed, default is 5 minutes)
-2. **Important**: Update `config.json` manually
+2. Changes are automatically saved to `config.json`
 
 ## Step 7: Verify Setup
 
@@ -273,8 +273,8 @@ Here's a complete example of a properly configured `config.json`:
 
 - **Always keep your bot token secret** - never share it or commit it to version control
 - **Backup your data files**: The bot creates `waitlist-data.json`, `queue-data.json`, and `tickets-data.json` - back these up regularly
-- **Update config.json manually**: The `/setup` commands help you configure, but you must manually update `config.json` for changes to persist after bot restarts
-- **Restart after config changes**: Always restart the bot after modifying `config.json`
+- **Automatic config saving**: The `/setup` commands automatically save changes to `config.json` - no manual editing needed
+- **Restart after config changes**: Always restart the bot after modifying `config.json` manually
 
 ## Support
 

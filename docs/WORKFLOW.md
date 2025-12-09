@@ -1,13 +1,12 @@
 # Queue System Workflows
 
-
-## 🧪 TESTER EXPERIENCE
+## TESTER EXPERIENCE
 
 ### Initial Setup (First Time)
 1. **Tester activates queue**: Tester goes to a queue channel (EU, NA, or AS) and uses `/q join`
    - Bot checks: Does tester have the required role? ✅
    - Tester is marked as active
-   - Queue state changes: **CLOSED** → **🟢 OPEN** (green)
+   - Queue state changes: **CLOSED** → **OPEN** (green)
    - Embed updates immediately showing tester in "Active Testers" section
    - "Join Queue" button becomes enabled for players
    - Ping role is notified that the queue is open
@@ -17,7 +16,7 @@
 #### Scenario A: Starting Fresh (No Previous Queue Members)
 1. **Tester becomes available**:
    - Tester uses `/q join` in a queue channel
-   - Queue state: **🟢 OPEN**
+   - Queue state: **OPEN**
    - Players can now click "Join Queue"
 
 2. **Testing players**:
@@ -29,20 +28,20 @@
 
 3. **Tester needs a break**:
    - Tester uses `/q leave`
-   - If last tester, queue goes **🔴 CLOSED**
+   - If last tester, queue goes **CLOSED**
    - "Join Queue" button becomes disabled
    - Player positions are saved
 
 4. **Tester comes back**:
    - Tester uses `/q join` again
-   - Queue goes back **🟢 OPEN**
+   - Queue goes back **OPEN**
    - Players can join again
 
 #### Scenario B: Reopening Queue with Previous Members
 1. **Tester reopens queue** (after it was closed with players in it):
    - Tester uses `/q join` in the queue channel
    - Bot checks: Are there previous queue members? ✅ Yes
-   - Queue enters **⏳ CONFIRMATION PERIOD** state (orange)
+   - Queue enters **CONFIRMATION PERIOD** state (orange)
    - Bot sends a confirmation message pinging all previous members
    - Embed shows:
      - Orange color
@@ -61,7 +60,7 @@
    - Bot reorganizes queue:
      - Confirmed users → renumbered to fill gaps (e.g., positions 1,4,5,7 → 1,2,3,4)
      - Unconfirmed users → removed from queue
-   - Queue state: **⏳ CONFIRMATION PERIOD** → **🟢 OPEN**
+   - Queue state: **CONFIRMATION PERIOD** → **OPEN**
    - "Join Queue" button becomes enabled
    - New players can now join
 
@@ -76,7 +75,7 @@
 
 ---
 
-## 👥 USER/PLAYER EXPERIENCE
+## USER/PLAYER EXPERIENCE
 
 ### Joining the Waitlist
 
@@ -106,9 +105,9 @@
 1. **Find queue embed**:
    - Player goes to their unlocked region queue channel
    - Player sees queue embed showing current status:
-     - **🟢 OPEN** (green) = Can join
-     - **🔴 CLOSED** (red) = Cannot join, no testers
-     - **⏳ CONFIRMATION PERIOD** (orange) = Cannot join yet, waiting for previous members
+     - **OPEN** (green) = Can join
+     - **CLOSED** (red) = Cannot join, no testers
+     - **CONFIRMATION PERIOD** (orange) = Cannot join yet, waiting for previous members
 
 2. **Join queue** (when open):
    - Player clicks **"Join Queue"** button
@@ -139,7 +138,7 @@
 1. **Queue was closed, now reopening**:
    - Player was in queue when tester closed it
    - Player receives ping in queue channel: `@player The [REGION] queue has reopened! If you're still active, please click the button below within **5:00** to keep your position in the queue.`
-   - Embed changes to orange **⏳ CONFIRMATION PERIOD** state
+   - Embed changes to orange **CONFIRMATION PERIOD** state
    - "Join Queue" button disappears
    - "Still Active" button appears in confirmation message
 
@@ -161,19 +160,19 @@
 
 ### Queue States (Player Perspective)
 
-#### 🟢 OPEN (Green)
+#### OPEN (Green)
 - **Can join**: Yes ✅
 - **Can leave**: Yes ✅ (if already in queue)
 - **What it means**: Testers are available, testing is happening
 
-#### 🔴 CLOSED (Red)
-- **Can join**: No ❌ (button disabled)
+#### CLOSED (Red)
+- **Can join**: No (button disabled)
 - **Can leave**: Yes ✅ (if already in queue)
 - **What it means**: No testers available, queue is closed
 - **Note**: Your position is saved, you'll be pinged when queue reopens
 
-#### ⏳ CONFIRMATION PERIOD (Orange)
-- **Can join**: No ❌ (button disabled)
+#### CONFIRMATION PERIOD (Orange)
+- **Can join**: No (button disabled)
 - **Can retain position**: Yes ✅ (if you were in previous queue)
 - **What it means**: Queue is reopening, previous members have 5 minutes to confirm they're still active
 - **Countdown**: Shows time remaining (e.g., "4:23 remaining")
@@ -193,41 +192,41 @@
 
 ---
 
-## 🔄 Complete Example Scenario
+## Complete Example Scenario
 
 ### Day 1 - Evening Session
 1. **6:00 PM**: Player1 joins waitlist (Region: EU, Server: "Server1")
    - EU queue channel unlocked for Player1
-2. **6:05 PM**: Tester uses `/q join` in EU queue channel → 🟢 OPEN
+2. **6:05 PM**: Tester uses `/q join` in EU queue channel → OPEN
 3. **6:10 PM**: Player1 joins queue (position 1)
 4. **6:12 PM**: Player2 joins waitlist (Region: EU, Server: "Server2")
    - EU queue channel unlocked for Player2
 5. **6:15 PM**: Player2 joins queue (position 2)
 6. **6:20 PM**: Player1 reaches position 1 → Ticket created
    - Tester tests Player1 in ticket channel
-7. **6:30 PM**: Tester uses `/q leave` → 🔴 CLOSED
+7. **6:30 PM**: Tester uses `/q leave` → CLOSED
    - All positions saved: [Player1, Player2]
 
 ### Day 2 - Morning Session
-1. **10:00 AM**: Tester uses `/q join` in EU queue channel → ⏳ CONFIRMATION PERIOD
+1. **10:00 AM**: Tester uses `/q join` in EU queue channel → CONFIRMATION PERIOD
    - Bot pings: @Player1 @Player2
    - 5-minute countdown starts
 2. **10:01 AM**: Player1 clicks "Still Active" ✅
 3. **10:02 AM**: Player2 clicks "Still Active" ✅
 4. **10:05 AM**: Confirmation period ends
    - Queue order: [Player1 ✅, Player2 ✅] (both confirmed)
-   - Queue state: 🟢 OPEN
+   - Queue state: OPEN
 5. **10:06 AM**: Player3 joins waitlist (Region: EU, Server: "Server3")
    - EU queue channel unlocked for Player3
 6. **10:07 AM**: Player3 joins queue (position 3, after confirmed players)
 7. **10:10 AM**: Player1 reaches position 1 → Ticket created
    - Tester tests Player1, Player2, Player3
-8. **10:30 AM**: Tester uses `/q leave` → 🔴 CLOSED
+8. **10:30 AM**: Tester uses `/q leave` → CLOSED
    - New positions saved: [Player1, Player2, Player3]
 
 ---
 
-## 💡 Key Features
+## Key Features
 
 - **Waitlist System**: Players must join waitlist first to unlock queue channels
 - **Region-Based**: Separate queues for EU, NA, and AS regions
