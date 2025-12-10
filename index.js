@@ -96,6 +96,31 @@ function updateConfirmActiveDebounce(userId) {
 	confirmActiveDebounce.set(userId, Date.now());
 }
 
+/**
+ * Safely delete a channel by ID, handling cases where the channel may not exist
+ * @param {string} channelId - The channel ID to delete
+ * @returns {Promise<boolean>} True if deleted successfully, false otherwise
+ */
+async function safeDeleteChannel(channelId) {
+	try {
+		let channel = bot.channels.cache.get(channelId);
+		if (channel) {
+			await channel.fetch();
+			await channel.delete();
+			return true;
+		} else {
+			const fetchedChannel = await bot.channels.fetch(channelId).catch(() => null);
+			if (fetchedChannel) {
+				await fetchedChannel.delete();
+				return true;
+			}
+		}
+	} catch (error) {
+		console.warn(`Could not delete channel ${channelId}:`, error.message);
+	}
+	return false;
+}
+
 // ============================================================================
 // QUEUE EMBED MANAGEMENT
 // ============================================================================
@@ -381,6 +406,29 @@ setInterval(() => {
 	}
 }, 30 * 1000);
 
+// Cleanup stale rate limit entries (every 5 minutes) - prevents memory leak
+setInterval(() => {
+	try {
+		const now = Date.now();
+		const rateLimitExpiry = BUTTON_RATE_LIMIT_MS * 10; // 10 seconds
+		const debounceExpiry = CONFIRM_ACTIVE_DEBOUNCE_MS * 10; // 50 seconds
+
+		for (const [userId, time] of buttonRateLimits.entries()) {
+			if (now - time > rateLimitExpiry) {
+				buttonRateLimits.delete(userId);
+			}
+		}
+
+		for (const [userId, time] of confirmActiveDebounce.entries()) {
+			if (now - time > debounceExpiry) {
+				confirmActiveDebounce.delete(userId);
+			}
+		}
+	} catch (error) {
+		console.error("Error cleaning up rate limit maps:", error.message);
+	}
+}, 5 * 60 * 1000);
+
 // Check confirmation periods periodically
 setInterval(() => {
 	try {
@@ -451,12 +499,11 @@ setInterval(async () => {
 				continue; // User not in waitlist (shouldn't happen, but handle gracefully)
 			}
 			
-			// Get an active tester
-			if (queue.activeTesters.length === 0) {
+			// Get an active tester using round-robin assignment
+			const testerId = queueManager.getNextTesterRoundRobin(region);
+			if (!testerId) {
 				continue; // No active testers
 			}
-			
-			const testerId = queue.activeTesters[0]; // Use first active tester
 			
 			// Remove user from queue
 			queueManager.removeNextUser(region);
@@ -1132,31 +1179,8 @@ bot.on("interactionCreate", async (interaction) => {
 					return interaction.reply({ content: "You don't have permission to cancel this ticket. Only the tester or player can cancel it.", ephemeral: true });
 				}
 				
-				// Check if channel still exists before trying to delete
-				try {
-					const channel = bot.channels.cache.get(ticket.channelId);
-					if (channel) {
-						try {
-							await channel.fetch();
-							await channel.delete();
-						} catch (fetchError) {
-							console.warn(`Could not access ticket channel ${ticket.channelId}:`, fetchError.message);
-						}
-					} else {
-						try {
-							const fetchedChannel = await bot.channels.fetch(ticket.channelId);
-							if (fetchedChannel) {
-								await fetchedChannel.delete();
-							}
-						} catch (fetchError) {
-							console.warn(`Ticket channel ${ticket.channelId} no longer exists:`, fetchError.message);
-						}
-					}
-				} catch (error) {
-					console.warn(`Error deleting ticket channel ${ticket.channelId}:`, error.message);
-				}
-				
-				// Close ticket (remove from data) regardless of whether channel deletion succeeded
+				// Delete ticket channel and close ticket
+				await safeDeleteChannel(ticket.channelId);
 				ticketManager.closeTicket(ticketId);
 				await interaction.reply({ content: "Ticket cancelled.", ephemeral: true });
 			} else if (customId.startsWith("ticketSubmit_")) {
@@ -1212,31 +1236,8 @@ bot.on("interactionCreate", async (interaction) => {
 				const cooldownDays = config.waitlistCooldownDays || 30;
 				waitlistManager.setCooldown(playerUserId, cooldownDays);
 				
-				// Check if channel still exists before trying to delete
-				try {
-					const channel = bot.channels.cache.get(ticket.channelId);
-					if (channel) {
-						try {
-							await channel.fetch();
-							await channel.delete();
-						} catch (fetchError) {
-							console.warn(`Could not access ticket channel ${ticket.channelId}:`, fetchError.message);
-						}
-					} else {
-						try {
-							const fetchedChannel = await bot.channels.fetch(ticket.channelId);
-							if (fetchedChannel) {
-								await fetchedChannel.delete();
-							}
-						} catch (fetchError) {
-							console.warn(`Ticket channel ${ticket.channelId} no longer exists:`, fetchError.message);
-						}
-					}
-				} catch (error) {
-					console.warn(`Error deleting ticket channel ${ticket.channelId}:`, error.message);
-				}
-				
-				// Close ticket (remove from data) regardless of whether channel deletion succeeded
+				// Delete ticket channel and close ticket
+				await safeDeleteChannel(ticket.channelId);
 				ticketManager.closeTicket(ticketId);
 				await interaction.reply({ content: `Ticket submitted. Player has been removed from waitlist and will be on cooldown for ${cooldownDays} days.`, ephemeral: true });
 			}

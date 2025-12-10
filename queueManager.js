@@ -20,7 +20,7 @@ const SAVE_DEBOUNCE_MS = 2000; // Save at most every 2 seconds (unless forced)
 // STATE MANAGEMENT
 // ============================================================================
 
-// Queue structure: { EU: { users: [], activeTesters: [], state: "closed"|"open"|"confirmation_period", messageId, confirmationMessageId, previousUsers: [], confirmedUsers: [], confirmationEndTime: null }, ... }
+// Queue structure: { EU: { users: [], activeTesters: [], state: "closed"|"open"|"confirmation_period", messageId, confirmationMessageId, previousUsers: [], confirmedUsers: [], confirmationEndTime: null, lastAssignedTesterIndex: 0 }, ... }
 let queues = {};
 
 // Persistence optimization: track if data has changed
@@ -65,7 +65,8 @@ function getQueue(region) {
 			pingMessageId: null, // Track ping notification messages
 			previousUsers: [],
 			confirmedUsers: [],
-			confirmationEndTime: null
+			confirmationEndTime: null,
+			lastAssignedTesterIndex: 0 // For round-robin tester assignment
 		};
 	}
 	return queues[region];
@@ -87,6 +88,30 @@ function getAllQueues() {
 function isQueueOpen(region) {
 	const queue = getQueue(region);
 	return queue.state === "open";
+}
+
+/**
+ * Get next tester for assignment using round-robin
+ * @param {string} region - Region
+ * @returns {string|null} Tester ID or null if no testers available
+ */
+function getNextTesterRoundRobin(region) {
+	const queue = getQueue(region);
+	if (!queue || queue.activeTesters.length === 0) {
+		return null;
+	}
+
+	// Get current index, wrapping around if needed
+	const testerCount = queue.activeTesters.length;
+	const currentIndex = queue.lastAssignedTesterIndex % testerCount;
+	const testerId = queue.activeTesters[currentIndex];
+
+	// Increment for next assignment
+	queue.lastAssignedTesterIndex = (currentIndex + 1) % testerCount;
+	markDataChanged();
+	saveAllQueues();
+
+	return testerId;
 }
 
 // ============================================================================
@@ -624,6 +649,7 @@ module.exports = {
 	getQueue,
 	getAllQueues,
 	isQueueOpen,
+	getNextTesterRoundRobin,
 	saveAllQueues,
 	addUser,
 	removeUser,

@@ -15,20 +15,20 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
 3. Go to the **"Bot"** section in the left sidebar
 4. Click **"Add Bot"** and confirm
 5. Under **"Privileged Gateway Intents"**, enable:
-   - ✅ **Server Members Intent** (required for role checking)
-   - ✅ **Message Content Intent** (required for reading messages)
+   - **Server Members Intent** (required for role checking)
+   - **Message Content Intent** (required for reading messages)
 6. Copy the **Bot Token** (you'll need this later)
 7. Go to the **"OAuth2" > "URL Generator"** section:
    - Select **"bot"** scope
    - Select **"applications.commands"** scope
    - Under **"Bot Permissions"**, select:
-     - ✅ Manage Channels
-     - ✅ View Channels
-     - ✅ Send Messages
-     - ✅ Embed Links
-     - ✅ Read Message History
-     - ✅ Use External Emojis
-     - ✅ Manage Roles (optional, if you want the bot to manage roles)
+     - Manage Channels
+     - View Channels
+     - Send Messages
+     - Embed Links
+     - Read Message History
+     - Use External Emojis
+     - Manage Roles (optional, if you want the bot to manage roles)
    - Copy the generated URL and open it in your browser
    - Select your server and authorize the bot
 
@@ -38,10 +38,28 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
 2. Open a terminal in the project directory
 3. Install dependencies:
    ```bash
-   npm install discord.js@14.14.1
+   npm install
    ```
 
 ## Step 3: Configure the Bot
+
+The bot uses two configuration files: `.env` for the bot token (secret) and `config.json` for other settings.
+
+### 3.1 Set Up Environment Variables
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Open `.env` in a text editor and add your bot token:
+   ```
+   DISCORD_TOKEN=YOUR_BOT_TOKEN_HERE
+   ```
+
+**Important**: Never share or commit your `.env` file. It contains your secret bot token.
+
+### 3.2 Set Up Configuration File
 
 1. Copy `config.example.json` to `config.json`:
    ```bash
@@ -54,7 +72,6 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
 
    ```json
    {
-     "token": "YOUR_BOT_TOKEN_HERE",
      "waitlistChannelId": "YOUR_WAITLIST_CHANNEL_ID",
      "queueChannels": {
        "EU": "YOUR_EU_QUEUE_CHANNEL_ID",
@@ -74,7 +91,10 @@ This guide will walk you through setting up the Discord Waitlist Queue Bot from 
 
 ### Configuration Fields Explained
 
-- **`token`**: Your Discord bot token (from Step 1)
+**Environment Variables (`.env`)**:
+- **`DISCORD_TOKEN`**: Your Discord bot token (from Step 1) - stored separately for security
+
+**Configuration File (`config.json`)**:
 - **`waitlistChannelId`**: The channel ID where the waitlist embed will appear
 - **`queueChannels`**: Object containing channel IDs for each region's queue
   - **`EU`**: Channel ID for the EU queue
@@ -157,9 +177,9 @@ For each **queue channel** (EU, NA, AS):
    ```
 
 3. If you see errors, check:
-   - Is your bot token correct?
-   - Are all channel IDs correct?
-   - Are all role IDs correct?
+   - Is your bot token correct in `.env`?
+   - Are all channel IDs correct in `config.json`?
+   - Are all role IDs correct in `config.json`?
    - Does the bot have the required permissions?
 
 ## Step 6: Initial Bot Setup (Using Commands)
@@ -212,27 +232,6 @@ For each region (EU, NA, AS):
 2. Changes are automatically saved to `config.json`
 3. This sets how many days players must wait before rejoining the waitlist after a tester submits their ticket
 
-## Step 8: Clear Bot Data (Admin Only)
-
-If you need to reset the bot's data without losing your configuration, you can use the `/clear` commands:
-
-### Clear Commands
-
-- **`/clear all`**: Clears all temporary data (queues, waitlist, tickets, cooldowns)
-  - This does NOT affect `config.json` - your configuration remains intact
-  - Use this to completely reset the bot state
-  
-- **`/clear queues`**: Clears only queue data
-  - Removes all players from queues, resets queue states
-  
-- **`/clear waitlist`**: Clears only waitlist data and cooldowns
-  - Removes all users from waitlist and clears all cooldowns
-  
-- **`/clear tickets`**: Clears only ticket data
-  - Removes all ticket records (note: this does not delete ticket channels, only the ticket records)
-
-**Important**: These commands require Administrator permissions and permanently delete the specified data. Use with caution!
-
 ## Step 7: Verify Setup
 
 1. **Check Waitlist Channel**:
@@ -248,11 +247,32 @@ If you need to reset the bot's data without losing your configuration, you can u
    - Run `/q join` - the queue should open
    - Run `/q leave` - the queue should close
 
+## Step 8: Clear Bot Data (Admin Only)
+
+If you need to reset the bot's data without losing your configuration, you can use the `/clear` commands:
+
+### Clear Commands
+
+- **`/clear all`**: Clears all temporary data (queues, waitlist, tickets, cooldowns)
+  - This does NOT affect `config.json` or `.env` - your configuration remains intact
+  - Use this to completely reset the bot state
+
+- **`/clear queues`**: Clears only queue data
+  - Removes all players from queues, resets queue states
+
+- **`/clear waitlist`**: Clears only waitlist data and cooldowns
+  - Removes all users from waitlist and clears all cooldowns
+
+- **`/clear tickets`**: Clears only ticket data
+  - Removes all ticket records (note: this does not delete ticket channels, only the ticket records)
+
+**Important**: These commands require Administrator permissions and permanently delete the specified data. Use with caution!
+
 ## Troubleshooting
 
 ### Bot doesn't start
 
-- **Error: "token is required"**: Check that `config.json` has a valid token
+- **Error: "DISCORD_TOKEN environment variable is required"**: Check that `.env` has a valid token
 - **Error: "waitlistChannelId is required"**: Make sure all required fields are filled in `config.json`
 - **Error: "Invalid token"**: Your bot token is incorrect or expired
 
@@ -285,19 +305,24 @@ If you need to reset the bot's data without losing your configuration, you can u
 Once setup is complete:
 
 1. **Assign Tester Roles**: Give the tester role to users who will be testing players
-2. **Test the Workflow**: 
+2. **Test the Workflow**:
    - Have a user join the waitlist
    - Have a tester use `/q join` in a queue channel
    - Have the user join the queue
 3. **Read the Workflow Guide**: See [WORKFLOW.md](WORKFLOW.md) for detailed information about how the system works
 
-## Configuration File Example
+## Configuration File Examples
 
-Here's a complete example of a properly configured `config.json`:
+### `.env` Example
+
+```
+DISCORD_TOKEN=YOUR_BOT_TOKEN_HERE
+```
+
+### `config.json` Example
 
 ```json
 {
-  "token": "YOUR_BOT_TOKEN_HERE",
   "waitlistChannelId": "1234567890123456789",
   "queueChannels": {
     "EU": "9876543210987654321",
@@ -318,7 +343,7 @@ Here's a complete example of a properly configured `config.json`:
 
 ## Important Notes
 
-- **Always keep your bot token secret** - never share it or commit it to version control
+- **Always keep your bot token secret** - never share it or commit `.env` to version control
 - **Backup your data files**: The bot creates `waitlist-data.json`, `queue-data.json`, and `tickets-data.json` - back these up regularly
 - **Automatic config saving**: The `/setup` commands automatically save changes to `config.json` - no manual editing needed
 - **Restart after config changes**: Always restart the bot after modifying `config.json` manually
@@ -331,4 +356,3 @@ If you encounter issues not covered in this guide:
 2. Verify all IDs are correct (channel IDs, role IDs)
 3. Ensure the bot has all required permissions
 4. Check that Node.js version is compatible (v16.9.0+)
-

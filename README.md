@@ -10,6 +10,7 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 - **Automatic Role Assignment**: Players automatically receive the region-specific ping role when joining the waitlist (e.g., @EU Queue, @NA Queue, @AS Queue)
 - **Waitlist Cooldown System**: Players who complete testing are placed on cooldown before they can rejoin the waitlist (configurable, default 30 days)
 - **Tester Management**: Testers can activate/deactivate queues using `/q join` and `/q leave`
+- **Round-Robin Tester Assignment**: When multiple testers are active, tickets are assigned fairly using round-robin scheduling
 - **Tester Conflict Prevention**: Testers are automatically removed from waitlist/queues as players when they activate as testers
 - **Queue Retention System**: When queues close and reopen, players can confirm they're still active during a grace period
 - **Automatic Ticket Creation**: When a player reaches position 1, a private ticket channel is automatically created
@@ -36,12 +37,12 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 
 2. **Install dependencies**:
    ```bash
-   npm install discord.js@14.14.1
+   npm install
    ```
 
 3. **Configure the bot**:
-   - Copy `config.example.json` to `config.json`
-   - Fill in your bot token, channel IDs, and role IDs
+   - Copy `.env.example` to `.env` and add your bot token
+   - Copy `config.example.json` to `config.json` and fill in channel IDs and role IDs
    - See [SETUP.md](docs/SETUP.md) for detailed setup instructions
 
 4. **Start the bot**:
@@ -51,17 +52,16 @@ A Discord bot for managing region-based testing queues with a waitlist system. P
 
 ## Quick Setup
 
-**Important**: The bot token is **REQUIRED** in `config.json` regardless of which setup method you choose. The bot cannot start without it.
-
 You have two options for setup:
 
 ### Method 1: Using `/setup` Commands (Easier)
 
 1. Create channels for waitlist and queues (EU, NA, AS)
 2. Create roles for testers and region-specific ping roles (one for each region: EU, NA, AS)
-3. **Create `config.json` with at minimum the `token` field** (required to start the bot)
-4. Start the bot
-5. Run `/setup` commands in Discord to configure everything (changes are automatically saved to `config.json`):
+3. **Create `.env` file with your bot token** (required to start the bot)
+4. **Create `config.json` with placeholder values** (will be updated via commands)
+5. Start the bot
+6. Run `/setup` commands in Discord to configure everything (changes are automatically saved to `config.json`):
    - `/setup waitlist <channel>` - Creates waitlist embed and saves to config.json
    - `/setup queue <region> <channel>` - Creates queue embeds for each region and saves to config.json
    - `/setup tester-role <role>` - Sets tester role and saves to config.json
@@ -74,8 +74,9 @@ You have two options for setup:
 
 1. Create channels for waitlist and queues (EU, NA, AS)
 2. Create roles for testers and region-specific ping roles (one for each region: EU, NA, AS)
-3. Manually edit `config.json` with all required fields (including `token`)
-4. Start the bot - it will automatically create the embeds
+3. Create `.env` file with your bot token
+4. Manually edit `config.json` with all required fields
+5. Start the bot - it will automatically create the embeds
 
 For detailed setup instructions with step-by-step guidance, see [SETUP.md](docs/SETUP.md).
 
@@ -131,7 +132,7 @@ For detailed command usage and examples, see [SETUP.md](docs/SETUP.md#step-6-ini
 
 - `/clear all` - Clear all data (queues, waitlist, tickets, cooldowns)
   - Requires administrator permissions
-  - Does NOT affect `config.json` - configuration remains unchanged
+  - Does NOT affect `config.json` or `.env` - configuration remains unchanged
 - `/clear queues` - Clear all queue data only
 - `/clear waitlist` - Clear all waitlist data and cooldowns only
 - `/clear tickets` - Clear all ticket data only
@@ -180,6 +181,7 @@ For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](d
 2. **Testing**:
    - Players join the queue
    - When a player reaches position 1, a ticket is automatically created
+   - Tester is assigned using round-robin when multiple testers are active
    - Tester tests the player in the ticket channel
    - After testing:
      - **Cancel**: Both tester and player can cancel (no cooldown applied)
@@ -193,9 +195,9 @@ For complete workflow documentation with detailed scenarios, see [WORKFLOW.md](d
 
 ### Queue States
 
-- **Closed** 🔴: No active testers, players cannot join
-- **Open** 🟢: Active testers available, players can join
-- **Confirmation Period** ⏳: Queue reopening, previous players have 5 minutes to confirm they're still active
+- **Closed**: No active testers, players cannot join
+- **Open**: Active testers available, players can join
+- **Confirmation Period**: Queue reopening, previous players have 5 minutes to confirm they're still active
 
 ### Queue Retention System
 
@@ -206,18 +208,27 @@ When a queue closes with players in it:
 - After 5 minutes, confirmed players keep their positions (renumbered), unconfirmed players are removed
 - See [WORKFLOW.md](docs/WORKFLOW.md#confirmation-period-experience) for complete details
 
-## Configuration File Reference
+## Configuration
 
-The bot uses `config.json` for configuration. See `config.example.json` for a template.
+The bot uses two configuration sources:
 
-**Important**: The `token` field is **REQUIRED** - the bot cannot start without it.
+### Environment Variables (`.env`)
 
-### Configuration Fields
+The bot token is stored in a `.env` file for security. See `.env.example` for the template.
+
+```
+DISCORD_TOKEN=your_discord_bot_token_here
+```
+
+**Important**: Never commit your `.env` file to version control. It is already included in `.gitignore`.
+
+### Configuration File (`config.json`)
+
+All other settings are stored in `config.json`. See `config.example.json` for a template.
 
 **Required Fields**:
-- `token`: Discord bot token (get from [Discord Developer Portal](https://discord.com/developers/applications)) - **REQUIRED to start bot**
-- `waitlistChannelId`: Channel ID for waitlist (right-click channel → Copy ID)
-- `queueChannels`: Object with EU, NA, AS channel IDs (right-click each channel → Copy ID)
+- `waitlistChannelId`: Channel ID for waitlist (right-click channel, Copy ID)
+- `queueChannels`: Object with EU, NA, AS channel IDs
   ```json
   "queueChannels": {
     "EU": "channel_id_here",
@@ -225,8 +236,8 @@ The bot uses `config.json` for configuration. See `config.example.json` for a te
     "AS": "channel_id_here"
   }
   ```
-- `testerRoleId`: Role ID for testers (right-click role → Copy ID)
-- `pingRoles`: Object with EU, NA, AS role IDs (right-click each role → Copy ID)
+- `testerRoleId`: Role ID for testers (right-click role, Copy ID)
+- `pingRoles`: Object with EU, NA, AS role IDs
   ```json
   "pingRoles": {
     "EU": "role_id_here",

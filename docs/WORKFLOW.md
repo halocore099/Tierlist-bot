@@ -4,9 +4,9 @@
 
 ### Initial Setup (First Time)
 1. **Tester activates queue**: Tester goes to a queue channel (EU, NA, or AS) and uses `/q join`
-   - Bot checks: Does tester have the required role? ✅
+   - Bot checks: Does tester have the required role?
    - Tester is marked as active
-   - Queue state changes: **CLOSED** → **OPEN** (green)
+   - Queue state changes: **CLOSED** -> **OPEN** (green)
    - Embed updates immediately showing tester in "Active Testers" section
    - "Join Queue" button becomes enabled for players
    - Region-specific ping role is notified that the queue is open (e.g., @EU Queue for EU queue)
@@ -23,6 +23,7 @@
    - Players join queue via "Join Queue" button
    - Tester sees players appear in queue list on embed
    - When a player reaches position 1, a ticket channel is automatically created
+   - If multiple testers are active, tickets are assigned using round-robin (fair distribution)
    - Tester tests players one by one in the ticket channels
    - Queue embed updates every 10 seconds automatically
 
@@ -40,7 +41,7 @@
 #### Scenario B: Reopening Queue with Previous Members
 1. **Tester reopens queue** (after it was closed with players in it):
    - Tester uses `/q join` in the queue channel
-   - Bot checks: Are there previous queue members? ✅ Yes
+   - Bot checks: Are there previous queue members? Yes
    - Queue enters **CONFIRMATION PERIOD** state (orange)
    - Bot sends a confirmation message pinging all previous members
    - Embed shows:
@@ -51,22 +52,30 @@
 
 2. **During confirmation period** (5 minutes):
    - Previous members can click **"Still Active"** button
-   - They get ✅ checkmark next to their name
+   - They get a checkmark next to their name
    - Embed updates showing their confirmed status
    - New players cannot join yet
 
 3. **After 5 minutes**:
    - Confirmation period ends automatically
    - Bot reorganizes queue:
-     - Confirmed users → renumbered to fill gaps (e.g., positions 1,4,5,7 → 1,2,3,4)
-     - Unconfirmed users → removed from queue
-   - Queue state: **CONFIRMATION PERIOD** → **OPEN**
+     - Confirmed users -> renumbered to fill gaps (e.g., positions 1,4,5,7 -> 1,2,3,4)
+     - Unconfirmed users -> removed from queue
+   - Queue state: **CONFIRMATION PERIOD** -> **OPEN**
    - "Join Queue" button becomes enabled
    - New players can now join
 
 4. **Testing continues**:
    - Tester tests players in order (confirmed users first, then new ones)
    - Normal workflow continues
+
+### Multiple Testers
+
+When multiple testers are active in a queue:
+- Tickets are assigned using **round-robin scheduling**
+- Each tester gets assigned tickets in rotation, ensuring fair distribution
+- Example with 3 testers (A, B, C): Ticket 1 -> A, Ticket 2 -> B, Ticket 3 -> C, Ticket 4 -> A, etc.
+- The round-robin index persists across bot restarts
 
 ### Tester Controls
 - **`/q join`**: Activate as tester and open queue
@@ -102,7 +111,7 @@
    - Player is automatically assigned the region-specific ping role (e.g., @EU Queue, @NA Queue, @AS Queue)
    - Player can now see and access their region queue channel
    - Player will be notified when that region's queue opens (via the ping role)
-   - Player gets confirmation: "✅ You have joined the waitlist for [REGION]! The [REGION] queue channel has been unlocked for you and you've been assigned the [REGION] queue role."
+   - Player gets confirmation: "You have joined the waitlist for [REGION]! The [REGION] queue channel has been unlocked for you and you've been assigned the [REGION] queue role."
 
 ### Joining a Queue
 
@@ -115,7 +124,7 @@
 
 2. **Join queue** (when open):
    - Player clicks **"Join Queue"** button
-   - Bot checks: Is queue open? ✅
+   - Bot checks: Is queue open?
    - Player is added to queue
    - Embed updates **immediately** showing player in queue list
    - Player sees their position number (e.g., "3. @player")
@@ -154,9 +163,9 @@
 
 2. **Retain position**:
    - Player clicks **"Still Active"** button
-   - Player gets ✅ checkmark next to their name in the embed
+   - Player gets checkmark next to their name in the embed
    - Embed updates showing retained status
-   - Player gets confirmation: "✅ You have confirmed you're still active! Your position will be retained."
+   - Player gets confirmation: "You have confirmed you're still active! Your position will be retained."
 
 3. **If player doesn't retain**:
    - Player doesn't click "Still Active" within 5 minutes
@@ -171,26 +180,27 @@
 ### Queue States (Player Perspective)
 
 #### OPEN (Green)
-- **Can join**: Yes ✅
-- **Can leave**: Yes ✅ (if already in queue)
+- **Can join**: Yes
+- **Can leave**: Yes (if already in queue)
 - **What it means**: Testers are available, testing is happening
 
 #### CLOSED (Red)
 - **Can join**: No (button disabled)
-- **Can leave**: Yes ✅ (if already in queue)
+- **Can leave**: Yes (if already in queue)
 - **What it means**: No testers available, queue is closed
 - **Note**: Your position is saved, you'll be pinged when queue reopens
 
 #### CONFIRMATION PERIOD (Orange)
 - **Can join**: No (button disabled)
-- **Can retain position**: Yes ✅ (if you were in previous queue)
+- **Can retain position**: Yes (if you were in previous queue)
 - **What it means**: Queue is reopening, previous members have 5 minutes to confirm they're still active
 - **Countdown**: Shows time remaining (e.g., "4:23 remaining")
 
 ### Visual Indicators
 
 - **Position number** = Your place in line (1 = first, 2 = second, etc.)
-- **✅** next to name = User has confirmed they're still active (during confirmation period)
+- **[Confirmed]** next to name = User has confirmed they're still active (during confirmation period)
+- **[Pending]** next to name = User has not yet confirmed (during confirmation period)
 
 ### Waitlist Cooldown System
 
@@ -210,7 +220,7 @@ When a tester submits a ticket (clicks "Submit" button):
 2. **Region Selection**: Choose your region carefully (EU, NA, or AS) - this unlocks that specific queue channel
 3. **Confirmation**: When queue reopens, you have 5 minutes to confirm you're still active
 4. **Rate limiting**: Can't spam buttons (1 second cooldown for most buttons, 5 seconds for "Still Active")
-5. **Queue order**: Confirmed users → New users
+5. **Queue order**: Confirmed users -> New users
 6. **Cooldown**: After a tester submits your ticket, you'll be on cooldown and cannot rejoin the waitlist until it expires
 
 ---
@@ -220,32 +230,41 @@ When a tester submits a ticket (clicks "Submit" button):
 ### Day 1 - Evening Session
 1. **6:00 PM**: Player1 joins waitlist (Region: EU, Server: "Server1")
    - EU queue channel unlocked for Player1
-2. **6:05 PM**: Tester uses `/q join` in EU queue channel → OPEN
+2. **6:05 PM**: Tester uses `/q join` in EU queue channel -> OPEN
 3. **6:10 PM**: Player1 joins queue (position 1)
 4. **6:12 PM**: Player2 joins waitlist (Region: EU, Server: "Server2")
    - EU queue channel unlocked for Player2
 5. **6:15 PM**: Player2 joins queue (position 2)
-6. **6:20 PM**: Player1 reaches position 1 → Ticket created
+6. **6:20 PM**: Player1 reaches position 1 -> Ticket created
    - Tester tests Player1 in ticket channel
-7. **6:30 PM**: Tester uses `/q leave` → CLOSED
+7. **6:30 PM**: Tester uses `/q leave` -> CLOSED
    - All positions saved: [Player1, Player2]
 
 ### Day 2 - Morning Session
-1. **10:00 AM**: Tester uses `/q join` in EU queue channel → CONFIRMATION PERIOD
+1. **10:00 AM**: Tester uses `/q join` in EU queue channel -> CONFIRMATION PERIOD
    - Bot pings: @Player1 @Player2
    - 5-minute countdown starts
-2. **10:01 AM**: Player1 clicks "Still Active" ✅
-3. **10:02 AM**: Player2 clicks "Still Active" ✅
+2. **10:01 AM**: Player1 clicks "Still Active" [Confirmed]
+3. **10:02 AM**: Player2 clicks "Still Active" [Confirmed]
 4. **10:05 AM**: Confirmation period ends
-   - Queue order: [Player1 ✅, Player2 ✅] (both confirmed)
+   - Queue order: [Player1, Player2] (both confirmed)
    - Queue state: OPEN
 5. **10:06 AM**: Player3 joins waitlist (Region: EU, Server: "Server3")
    - EU queue channel unlocked for Player3
 6. **10:07 AM**: Player3 joins queue (position 3, after confirmed players)
-7. **10:10 AM**: Player1 reaches position 1 → Ticket created
+7. **10:10 AM**: Player1 reaches position 1 -> Ticket created
    - Tester tests Player1, Player2, Player3
-8. **10:30 AM**: Tester uses `/q leave` → CLOSED
+8. **10:30 AM**: Tester uses `/q leave` -> CLOSED
    - New positions saved: [Player1, Player2, Player3]
+
+### Multiple Testers Example
+1. **2:00 PM**: TesterA uses `/q join` in NA queue channel -> OPEN
+2. **2:05 PM**: TesterB uses `/q join` in NA queue channel
+   - Now 2 active testers in NA queue
+3. **2:10 PM**: Player1 joins queue (position 1) -> Ticket created, assigned to TesterA
+4. **2:12 PM**: Player2 joins queue (position 1) -> Ticket created, assigned to TesterB
+5. **2:14 PM**: Player3 joins queue (position 1) -> Ticket created, assigned to TesterA (round-robin)
+6. **2:16 PM**: Player4 joins queue (position 1) -> Ticket created, assigned to TesterB
 
 ---
 
@@ -253,6 +272,7 @@ When a tester submits a ticket (clicks "Submit" button):
 
 - **Waitlist System**: Players must join waitlist first to unlock queue channels
 - **Region-Based**: Separate queues for EU, NA, and AS regions
+- **Round-Robin Assignment**: Fair distribution of tickets among multiple active testers
 - **Persistent**: Queues survive bot restarts
 - **Automatic**: Ticket creation, confirmation periods, queue reorganization
 - **Real-time**: Embeds update immediately on actions

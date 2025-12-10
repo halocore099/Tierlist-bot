@@ -5,6 +5,7 @@
 // ============================================================================
 
 const fs = require("fs");
+require("dotenv").config();
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -24,10 +25,13 @@ function loadConfig() {
 	try {
 		const configData = fs.readFileSync("config.json", "utf-8");
 		config = JSON.parse(configData);
-		
+
+		// Load token from environment variable (more secure than config.json)
+		config.token = process.env.DISCORD_TOKEN;
+
 		// Validate required fields
 		if (!config.token) {
-			throw new Error("'token' is required in config.json");
+			throw new Error("'DISCORD_TOKEN' environment variable is required (set in .env file)");
 		}
 		
 		if (!config.waitlistChannelId) {
@@ -113,8 +117,7 @@ function saveConfig() {
 			console.error("⚠️ Cannot save config: token is missing. This prevents accidental token loss.");
 			return false;
 		}
-		
-		const fs = require("fs");
+
 		const jsonData = JSON.stringify(config, null, 2);
 		fs.writeFileSync("config.json", jsonData, "utf-8");
 		console.log("✓ Config saved to config.json");
